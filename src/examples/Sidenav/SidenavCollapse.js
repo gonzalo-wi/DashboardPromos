@@ -18,6 +18,7 @@ import PropTypes from "prop-types";
 
 // @mui material components
 import ListItem from "@mui/material/ListItem";
+import Grow from "@mui/material/Grow";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Icon from "@mui/material/Icon";
@@ -41,44 +42,63 @@ function SidenavCollapse({ icon, name, active, ...rest }) {
   const { miniSidenav, transparentSidenav, whiteSidenav, darkMode, sidenavColor } = controller;
 
   return (
-    <ListItem component="li">
-      <MDBox
-        {...rest}
-        sx={(theme) =>
-          collapseItem(theme, {
-            active,
-            transparentSidenav,
-            whiteSidenav,
-            darkMode,
-            sidenavColor,
-          })
-        }
-      >
-        <ListItemIcon
-          sx={(theme) =>
-            collapseIconBox(theme, { transparentSidenav, whiteSidenav, darkMode, active })
-          }
-        >
-          {typeof icon === "string" ? (
-            <Icon sx={(theme) => collapseIcon(theme, { active })}>{icon}</Icon>
-          ) : (
-            icon
-          )}
-        </ListItemIcon>
-
-        <ListItemText
-          primary={name}
-          sx={(theme) =>
-            collapseText(theme, {
-              miniSidenav,
+    <Grow in timeout={400}>
+      <ListItem component="li">
+        <MDBox
+          {...rest}
+          sx={(theme) => ({
+            ...collapseItem(theme, {
+              active,
               transparentSidenav,
               whiteSidenav,
-              active,
-            })
-          }
-        />
-      </MDBox>
-    </ListItem>
+              darkMode,
+              sidenavColor,
+            }),
+            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            "&:hover": {
+              transform: "translateX(8px)",
+              boxShadow: active ? "0 4px 20px 0 rgba(0,0,0,0.14)" : "0 2px 10px 0 rgba(0,0,0,0.1)",
+            },
+          })}
+        >
+          <ListItemIcon
+            sx={(theme) => ({
+              ...collapseIconBox(theme, { transparentSidenav, whiteSidenav, darkMode, active }),
+              transition: "all 0.3s ease",
+              "&:hover": {
+                transform: "scale(1.15) rotate(5deg)",
+              },
+            })}
+          >
+            {typeof icon === "string" ? (
+              <Icon
+                sx={(theme) => ({
+                  ...collapseIcon(theme, { active }),
+                  transition: "all 0.3s ease",
+                })}
+              >
+                {icon}
+              </Icon>
+            ) : (
+              icon
+            )}
+          </ListItemIcon>
+
+          <ListItemText
+            primary={name}
+            sx={(theme) => ({
+              ...collapseText(theme, {
+                miniSidenav,
+                transparentSidenav,
+                whiteSidenav,
+                active,
+              }),
+              transition: "all 0.3s ease",
+            })}
+          />
+        </MDBox>
+      </ListItem>
+    </Grow>
   );
 }
 

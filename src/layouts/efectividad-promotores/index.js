@@ -13,6 +13,13 @@ import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
+import Fade from "@mui/material/Fade";
+import Grow from "@mui/material/Grow";
+import Zoom from "@mui/material/Zoom";
+import Icon from "@mui/material/Icon";
+import Chip from "@mui/material/Chip";
+import Avatar from "@mui/material/Avatar";
+import Tooltip from "@mui/material/Tooltip";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
@@ -236,120 +243,266 @@ function EfectividadPromotores() {
       <DashboardNavbar />
       <MDBox py={3}>
         {loading ? (
-          <MDBox display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-            <CircularProgress color="info" size={60} />
-          </MDBox>
+          <Fade in>
+            <MDBox
+              display="flex"
+              flexDirection="column"
+              justifyContent="center"
+              alignItems="center"
+              minHeight="60vh"
+            >
+              <CircularProgress color="info" size={60} thickness={4} />
+              <MDTypography variant="button" color="text" mt={2}>
+                Analizando datos...
+              </MDTypography>
+            </MDBox>
+          </Fade>
         ) : error ? (
-          <Alert severity="error">{error}</Alert>
+          <Fade in>
+            <Alert
+              severity="error"
+              icon={<Icon>error_outline</Icon>}
+              sx={{
+                animation: "shake 0.5s",
+                "@keyframes shake": {
+                  "0%, 100%": { transform: "translateX(0)" },
+                  "10%, 30%, 50%, 70%, 90%": { transform: "translateX(-5px)" },
+                  "20%, 40%, 60%, 80%": { transform: "translateX(5px)" },
+                },
+              }}
+            >
+              {error}
+            </Alert>
+          </Fade>
         ) : (
           <>
             {/* Filtros */}
-            <MDBox mb={3}>
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                  <FormControl fullWidth>
-                    <InputLabel>Período</InputLabel>
-                    <Select
-                      value={periodo}
-                      onChange={(e) => setPeriodo(e.target.value)}
-                      label="Período"
-                    >
-                      <MenuItem value="semana">Esta Semana</MenuItem>
-                      <MenuItem value="mes">Este Mes</MenuItem>
-                      <MenuItem value="trimestre">Este Trimestre</MenuItem>
-                      <MenuItem value="anio">Este Año</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <FormControl fullWidth>
-                    <InputLabel>Promotor</InputLabel>
-                    <Select
-                      value={promotorSeleccionado}
-                      onChange={(e) => setPromotorSeleccionado(e.target.value)}
-                      label="Promotor"
-                      disabled={loading || promotores.length === 0}
-                    >
-                      <MenuItem value="todos">Todos los promotores</MenuItem>
-                      {promotores.map((promotor) => (
-                        <MenuItem key={promotor.id} value={promotor.id.toString()}>
-                          {promotor.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-            </MDBox>
+            <Fade in timeout={400}>
+              <Card
+                sx={{
+                  mb: 3,
+                  overflow: "visible",
+                  boxShadow: "0 4px 20px 0 rgba(0,0,0,0.12)",
+                  transition: "all 0.3s",
+                  "&:hover": {
+                    boxShadow: "0 8px 30px 0 rgba(0,0,0,0.15)",
+                  },
+                }}
+              >
+                <MDBox
+                  mx={2}
+                  mt={-3}
+                  py={2}
+                  px={2}
+                  sx={{
+                    background: "linear-gradient(195deg, #42A5F5, #1976D2)",
+                    borderRadius: "lg",
+                    boxShadow: "0 4px 20px 0 rgba(33, 150, 243, 0.3)",
+                  }}
+                >
+                  <MDBox display="flex" alignItems="center" gap={1}>
+                    <Icon sx={{ color: "white", fontSize: 28 }}>filter_list</Icon>
+                    <MDTypography variant="h6" color="white" fontWeight="bold">
+                      Filtros de Análisis
+                    </MDTypography>
+                  </MDBox>
+                </MDBox>
+                <MDBox p={3}>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                      <Zoom in timeout={600}>
+                        <FormControl
+                          fullWidth
+                          sx={{
+                            transition: "all 0.3s",
+                            "&:hover": { transform: "translateY(-2px)" },
+                          }}
+                        >
+                          <Select
+                            value={periodo}
+                            onChange={(e) => setPeriodo(e.target.value)}
+                            displayEmpty
+                            sx={{
+                              "& .MuiSelect-select": {
+                                paddingTop: "16px",
+                                paddingBottom: "16px",
+                              },
+                            }}
+                          >
+                            <MenuItem value="semana">
+                              <MDBox display="flex" alignItems="center" gap={1}>
+                                <Icon fontSize="small">date_range</Icon>
+                                Esta Semana
+                              </MDBox>
+                            </MenuItem>
+                            <MenuItem value="mes">
+                              <MDBox display="flex" alignItems="center" gap={1}>
+                                <Icon fontSize="small">calendar_month</Icon>
+                                Este Mes
+                              </MDBox>
+                            </MenuItem>
+                            <MenuItem value="trimestre">
+                              <MDBox display="flex" alignItems="center" gap={1}>
+                                <Icon fontSize="small">event_note</Icon>
+                                Este Trimestre
+                              </MDBox>
+                            </MenuItem>
+                            <MenuItem value="anio">
+                              <MDBox display="flex" alignItems="center" gap={1}>
+                                <Icon fontSize="small">today</Icon>
+                                Este Año
+                              </MDBox>
+                            </MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Zoom>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Zoom in timeout={800}>
+                        <FormControl
+                          fullWidth
+                          sx={{
+                            transition: "all 0.3s",
+                            "&:hover": { transform: "translateY(-2px)" },
+                          }}
+                        >
+                          <Select
+                            value={promotorSeleccionado}
+                            onChange={(e) => setPromotorSeleccionado(e.target.value)}
+                            disabled={loading || promotores.length === 0}
+                            displayEmpty
+                            sx={{
+                              "& .MuiSelect-select": {
+                                paddingTop: "16px",
+                                paddingBottom: "16px",
+                              },
+                            }}
+                          >
+                            <MenuItem value="todos">
+                              <MDBox display="flex" alignItems="center" gap={1}>
+                                <Icon fontSize="small">groups</Icon>
+                                Todos los promotores
+                              </MDBox>
+                            </MenuItem>
+                            {promotores.map((promotor) => (
+                              <MenuItem key={promotor.id} value={promotor.id.toString()}>
+                                <MDBox display="flex" alignItems="center" gap={1}>
+                                  <Avatar sx={{ width: 20, height: 20, fontSize: 12 }}>
+                                    {promotor.name.charAt(0)}
+                                  </Avatar>
+                                  {promotor.name}
+                                </MDBox>
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Zoom>
+                    </Grid>
+                  </Grid>
+                </MDBox>
+              </Card>
+            </Fade>
 
             {/* Cards de resumen */}
             <MDBox mb={3}>
               <Grid container spacing={3}>
                 <Grid item xs={12} md={6} lg={3}>
-                  <MDBox mb={1.5}>
-                    <ComplexStatisticsCard
-                      color="dark"
-                      icon="groups"
-                      title="Total Clientes"
-                      count={metrics?.total || 0}
-                      percentage={{
-                        color: "success",
-                        amount: "",
-                        label: "en el período seleccionado",
+                  <Grow in timeout={600}>
+                    <MDBox
+                      mb={1.5}
+                      sx={{
+                        transition: "all 0.3s",
+                        "&:hover": { transform: "translateY(-8px)" },
                       }}
-                    />
-                  </MDBox>
+                    >
+                      <ComplexStatisticsCard
+                        color="dark"
+                        icon="groups"
+                        title="Total Clientes"
+                        count={metrics?.total || 0}
+                        percentage={{
+                          color: "success",
+                          amount: "",
+                          label: "en el período seleccionado",
+                        }}
+                      />
+                    </MDBox>
+                  </Grow>
                 </Grid>
                 <Grid item xs={12} md={6} lg={3}>
-                  <MDBox mb={1.5}>
-                    <ComplexStatisticsCard
-                      icon="trending_up"
-                      title="Promotores Activos"
-                      count={metrics?.porUsuario?.length || 0}
-                      percentage={{
-                        color: "success",
-                        amount: "",
-                        label: "con altas registradas",
+                  <Grow in timeout={800}>
+                    <MDBox
+                      mb={1.5}
+                      sx={{
+                        transition: "all 0.3s",
+                        "&:hover": { transform: "translateY(-8px)" },
                       }}
-                    />
-                  </MDBox>
+                    >
+                      <ComplexStatisticsCard
+                        icon="trending_up"
+                        title="Promotores Activos"
+                        count={metrics?.porUsuario?.length || 0}
+                        percentage={{
+                          color: "success",
+                          amount: "",
+                          label: "con altas registradas",
+                        }}
+                      />
+                    </MDBox>
+                  </Grow>
                 </Grid>
                 <Grid item xs={12} md={6} lg={3}>
-                  <MDBox mb={1.5}>
-                    <ComplexStatisticsCard
-                      color="success"
-                      icon="star"
-                      title="Mejor Promotor"
-                      count={
-                        metrics?.porUsuario && metrics.porUsuario.length > 0
-                          ? metrics.porUsuario[0].usuario
-                          : "N/A"
-                      }
-                      percentage={{
-                        color: "info",
-                        amount:
+                  <Grow in timeout={1000}>
+                    <MDBox
+                      mb={1.5}
+                      sx={{
+                        transition: "all 0.3s",
+                        "&:hover": { transform: "translateY(-8px)" },
+                      }}
+                    >
+                      <ComplexStatisticsCard
+                        color="success"
+                        icon="star"
+                        title="Mejor Promotor"
+                        count={
                           metrics?.porUsuario && metrics.porUsuario.length > 0
-                            ? metrics.porUsuario[0].total
-                            : 0,
-                        label: "clientes en el período",
-                      }}
-                    />
-                  </MDBox>
+                            ? metrics.porUsuario[0].usuario
+                            : "N/A"
+                        }
+                        percentage={{
+                          color: "info",
+                          amount:
+                            metrics?.porUsuario && metrics.porUsuario.length > 0
+                              ? metrics.porUsuario[0].total
+                              : 0,
+                          label: "clientes en el período",
+                        }}
+                      />
+                    </MDBox>
+                  </Grow>
                 </Grid>
                 <Grid item xs={12} md={6} lg={3}>
-                  <MDBox mb={1.5}>
-                    <ComplexStatisticsCard
-                      color="primary"
-                      icon="timeline"
-                      title="Promedio Diario"
-                      count={promedioAltasPorDia}
-                      percentage={{
-                        color: "success",
-                        amount: "",
-                        label: "clientes por día",
+                  <Grow in timeout={1200}>
+                    <MDBox
+                      mb={1.5}
+                      sx={{
+                        transition: "all 0.3s",
+                        "&:hover": { transform: "translateY(-8px)" },
                       }}
-                    />
-                  </MDBox>
+                    >
+                      <ComplexStatisticsCard
+                        color="primary"
+                        icon="timeline"
+                        title="Promedio Diario"
+                        count={promedioAltasPorDia}
+                        percentage={{
+                          color: "success",
+                          amount: "",
+                          label: "clientes por día",
+                        }}
+                      />
+                    </MDBox>
+                  </Grow>
                 </Grid>
               </Grid>
             </MDBox>
@@ -358,101 +511,196 @@ function EfectividadPromotores() {
             <Grid container spacing={3}>
               {/* Gráfico de clientes por promotor */}
               <Grid item xs={12} md={6} lg={6}>
-                <MDBox mb={3}>
-                  <ReportsBarChart
-                    color="info"
-                    title="Clientes por Promotor"
-                    description="Comparativa del período seleccionado"
-                    date="actualizado ahora"
-                    chart={clientesPorPromotor}
-                  />
-                </MDBox>
+                <Fade in timeout={1000}>
+                  <MDBox
+                    mb={3}
+                    sx={{
+                      transition: "all 0.3s",
+                      "&:hover": {
+                        transform: "translateY(-5px) scale(1.01)",
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                      },
+                    }}
+                  >
+                    <ReportsBarChart
+                      color="info"
+                      title="Clientes por Promotor"
+                      description="Comparativa del período seleccionado"
+                      date="actualizado ahora"
+                      chart={clientesPorPromotor}
+                    />
+                  </MDBox>
+                </Fade>
               </Grid>
 
               {/* Gráfico de evolución temporal */}
               <Grid item xs={12} md={6} lg={6}>
-                <MDBox mb={3}>
-                  <ReportsLineChart
-                    color="success"
-                    title="Evolución Semanal"
-                    description="Clientes nuevos por día"
-                    date="últimos 7 días"
-                    chart={evolucionTemporal}
-                  />
-                </MDBox>
+                <Fade in timeout={1200}>
+                  <MDBox
+                    mb={3}
+                    sx={{
+                      transition: "all 0.3s",
+                      "&:hover": {
+                        transform: "translateY(-5px) scale(1.01)",
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                      },
+                    }}
+                  >
+                    <ReportsLineChart
+                      color="success"
+                      title="Evolución Semanal"
+                      description="Clientes nuevos por día"
+                      date="últimos 7 días"
+                      chart={evolucionTemporal}
+                    />
+                  </MDBox>
+                </Fade>
               </Grid>
 
               {/* Gráfico de tipos de promociones */}
               <Grid item xs={12} md={6} lg={6}>
-                <MDBox mb={3}>
-                  <Card>
-                    <MDBox p={3}>
-                      <MDTypography variant="h6" fontWeight="medium" mb={2}>
-                        Tipos de Promociones
-                      </MDTypography>
-                      <MDBox mt={3}>
-                        <DefaultDoughnutChart
-                          icon={{ color: "success", component: "local_offer" }}
-                          title="Distribución"
-                          description="Promociones más usadas"
-                          chart={tiposPromo}
-                        />
+                <Zoom in timeout={1000}>
+                  <MDBox
+                    mb={3}
+                    sx={{
+                      transition: "all 0.3s",
+                      "&:hover": {
+                        transform: "scale(1.02)",
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                      },
+                    }}
+                  >
+                    <Card>
+                      <MDBox p={3}>
+                        <MDBox display="flex" alignItems="center" gap={1} mb={2}>
+                          <Icon sx={{ color: "success.main", fontSize: 24 }}>local_offer</Icon>
+                          <MDTypography variant="h6" fontWeight="medium">
+                            Tipos de Promociones
+                          </MDTypography>
+                        </MDBox>
+                        <MDBox mt={3}>
+                          <DefaultDoughnutChart
+                            icon={{ color: "success", component: "local_offer" }}
+                            title="Distribución"
+                            description="Promociones más usadas"
+                            chart={tiposPromo}
+                          />
+                        </MDBox>
                       </MDBox>
-                    </MDBox>
-                  </Card>
-                </MDBox>
+                    </Card>
+                  </MDBox>
+                </Zoom>
               </Grid>
 
               {/* Tabla detallada por promotor */}
               <Grid item xs={12} md={6} lg={6}>
-                <Card>
-                  <MDBox p={3}>
-                    <MDTypography variant="h6" fontWeight="medium" mb={3}>
-                      Detalle por Promotor
-                    </MDTypography>
-                    {metrics?.porUsuario && metrics.porUsuario.length > 0 ? (
-                      <MDBox>
-                        {metrics.porUsuario.map((item, index) => (
-                          <MDBox
-                            key={index}
-                            display="flex"
-                            justifyContent="space-between"
-                            alignItems="center"
-                            mb={2}
-                            p={2}
-                            sx={{
-                              backgroundColor: index === 0 ? "success.light" : "grey.100",
-                              borderRadius: 1,
-                            }}
-                          >
-                            <MDBox>
-                              <MDTypography variant="button" fontWeight="medium">
-                                {item.usuario}
-                              </MDTypography>
-                              <MDTypography variant="caption" color="text" display="block">
-                                Promedio: {item.promedio} / día
-                              </MDTypography>
-                            </MDBox>
-                            <MDBox textAlign="right">
-                              <MDTypography variant="h6" fontWeight="bold" color="dark">
-                                {item.total}
-                              </MDTypography>
-                              <MDTypography variant="caption" color="text">
-                                clientes
-                              </MDTypography>
-                            </MDBox>
-                          </MDBox>
-                        ))}
-                      </MDBox>
-                    ) : (
-                      <MDBox textAlign="center" py={3}>
-                        <MDTypography variant="caption" color="text">
-                          No hay datos disponibles
+                <Zoom in timeout={1200}>
+                  <Card
+                    sx={{
+                      transition: "all 0.3s",
+                      "&:hover": {
+                        transform: "scale(1.02)",
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                      },
+                    }}
+                  >
+                    <MDBox p={3}>
+                      <MDBox display="flex" alignItems="center" gap={1} mb={3}>
+                        <Icon sx={{ color: "info.main", fontSize: 24 }}>leaderboard</Icon>
+                        <MDTypography variant="h6" fontWeight="medium">
+                          Detalle por Promotor
                         </MDTypography>
                       </MDBox>
-                    )}
-                  </MDBox>
-                </Card>
+                      {metrics?.porUsuario && metrics.porUsuario.length > 0 ? (
+                        <MDBox>
+                          {metrics.porUsuario.map((item, index) => (
+                            <Fade in timeout={1400 + index * 100} key={index}>
+                              <MDBox
+                                display="flex"
+                                justifyContent="space-between"
+                                alignItems="center"
+                                mb={2}
+                                p={2}
+                                sx={{
+                                  backgroundColor:
+                                    index === 0 ? "rgba(76, 175, 80, 0.1)" : "grey.100",
+                                  borderRadius: 2,
+                                  border: index === 0 ? "2px solid" : "none",
+                                  borderColor: index === 0 ? "success.main" : "transparent",
+                                  transition: "all 0.3s",
+                                  "&:hover": {
+                                    transform: "translateX(8px)",
+                                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                                  },
+                                }}
+                              >
+                                <MDBox display="flex" alignItems="center" gap={1.5}>
+                                  <Tooltip title={index === 0 ? "¡Líder!" : ""} arrow>
+                                    <Avatar
+                                      sx={{
+                                        width: 40,
+                                        height: 40,
+                                        bgcolor: index === 0 ? "success.main" : "info.main",
+                                        fontWeight: "bold",
+                                        fontSize: 16,
+                                      }}
+                                    >
+                                      {item.usuario.charAt(0).toUpperCase()}
+                                    </Avatar>
+                                  </Tooltip>
+                                  <MDBox>
+                                    <MDBox display="flex" alignItems="center" gap={1}>
+                                      <MDTypography variant="button" fontWeight="medium">
+                                        {item.usuario}
+                                      </MDTypography>
+                                      {index === 0 && (
+                                        <Icon sx={{ color: "warning.main", fontSize: 18 }}>
+                                          star
+                                        </Icon>
+                                      )}
+                                    </MDBox>
+                                    <MDBox display="flex" alignItems="center" gap={0.5}>
+                                      <Icon sx={{ fontSize: 12, color: "text.secondary" }}>
+                                        trending_up
+                                      </Icon>
+                                      <MDTypography variant="caption" color="text">
+                                        Promedio: {item.promedio} / día
+                                      </MDTypography>
+                                    </MDBox>
+                                  </MDBox>
+                                </MDBox>
+                                <MDBox textAlign="right">
+                                  <Chip
+                                    label={item.total}
+                                    color={index === 0 ? "success" : "info"}
+                                    sx={{ fontWeight: "bold", fontSize: "0.9rem", height: 28 }}
+                                  />
+                                  <MDTypography
+                                    variant="caption"
+                                    color="text"
+                                    display="block"
+                                    mt={0.5}
+                                  >
+                                    clientes
+                                  </MDTypography>
+                                </MDBox>
+                              </MDBox>
+                            </Fade>
+                          ))}
+                        </MDBox>
+                      ) : (
+                        <Fade in>
+                          <MDBox textAlign="center" py={3}>
+                            <Icon sx={{ fontSize: 48, color: "text.secondary", mb: 1 }}>inbox</Icon>
+                            <MDTypography variant="caption" color="text" display="block">
+                              No hay datos disponibles
+                            </MDTypography>
+                          </MDBox>
+                        </Fade>
+                      )}
+                    </MDBox>
+                  </Card>
+                </Zoom>
               </Grid>
             </Grid>
           </>

@@ -22,6 +22,10 @@ import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
+import Fade from "@mui/material/Fade";
+import Zoom from "@mui/material/Zoom";
+import Tooltip from "@mui/material/Tooltip";
+import Avatar from "@mui/material/Avatar";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
@@ -251,35 +255,129 @@ function Promotores() {
   // Preparar filas de la tabla
   const rows = users.map((user) => ({
     name: (
-      <MDTypography variant="button" fontWeight="medium">
-        {user.name}
-      </MDTypography>
+      <MDBox display="flex" alignItems="center" gap={1.5}>
+        <Avatar
+          sx={{
+            bgcolor: user.active ? "info.main" : "grey.400",
+            width: 40,
+            height: 40,
+            fontSize: 16,
+            fontWeight: "bold",
+            transition: "all 0.3s",
+            "&:hover": {
+              transform: "scale(1.1)",
+              boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+            },
+          }}
+        >
+          {user.name.charAt(0).toUpperCase()}
+        </Avatar>
+        <MDBox>
+          <MDTypography variant="button" fontWeight="medium">
+            {user.name}
+          </MDTypography>
+          <MDTypography variant="caption" color="text" display="block" sx={{ fontSize: "0.7rem" }}>
+            {user.username}
+          </MDTypography>
+        </MDBox>
+      </MDBox>
     ),
     username: (
-      <MDTypography variant="caption" color="text">
-        {user.username}
-      </MDTypography>
+      <Chip
+        icon={<Icon fontSize="small">person</Icon>}
+        label={user.username}
+        size="small"
+        variant="outlined"
+        sx={{
+          borderRadius: "8px",
+          fontWeight: "medium",
+        }}
+      />
     ),
     email: (
-      <MDTypography variant="caption" color="text">
-        {user.email || "-"}
-      </MDTypography>
+      <MDBox display="flex" alignItems="center" gap={0.5}>
+        {user.email ? (
+          <>
+            <Icon fontSize="small" sx={{ color: "text.secondary" }}>
+              email
+            </Icon>
+            <MDTypography variant="caption" color="text">
+              {user.email}
+            </MDTypography>
+          </>
+        ) : (
+          <MDTypography variant="caption" color="text" fontStyle="italic">
+            Sin email
+          </MDTypography>
+        )}
+      </MDBox>
     ),
     role: (
       <Chip
+        icon={
+          <Icon fontSize="small">
+            {user.role === "admin" ? "admin_panel_settings" : "person_outline"}
+          </Icon>
+        }
         label={user.role_display || user.role}
         color={user.role === "admin" ? "warning" : "info"}
         size="small"
+        sx={{
+          fontWeight: "bold",
+          borderRadius: "8px",
+          "& .MuiChip-icon": {
+            marginLeft: "8px",
+          },
+        }}
       />
     ),
     status: (
-      <Switch checked={user.active} onChange={() => handleToggleStatus(user)} color="success" />
+      <Tooltip title={user.active ? "Usuario Activo" : "Usuario Inactivo"} arrow>
+        <MDBox display="flex" alignItems="center" gap={1}>
+          <Switch
+            checked={user.active}
+            onChange={() => handleToggleStatus(user)}
+            color="success"
+            sx={{
+              "& .MuiSwitch-thumb": {
+                transition: "all 0.3s",
+              },
+              "&:hover .MuiSwitch-thumb": {
+                boxShadow: "0 0 8px rgba(76, 175, 80, 0.6)",
+              },
+            }}
+          />
+          <Chip
+            label={user.active ? "Activo" : "Inactivo"}
+            size="small"
+            color={user.active ? "success" : "default"}
+            sx={{
+              fontSize: "0.65rem",
+              height: "20px",
+              fontWeight: "bold",
+            }}
+          />
+        </MDBox>
+      </Tooltip>
     ),
     actions: (
       <MDBox display="flex" gap={1} justifyContent="center">
-        <IconButton size="small" color="info" onClick={() => handleOpenEditModal(user)}>
-          <Icon>edit</Icon>
-        </IconButton>
+        <Tooltip title="Editar usuario" arrow>
+          <IconButton
+            size="small"
+            color="info"
+            onClick={() => handleOpenEditModal(user)}
+            sx={{
+              transition: "all 0.3s",
+              "&:hover": {
+                transform: "scale(1.15) rotate(5deg)",
+                boxShadow: "0 4px 8px rgba(33, 150, 243, 0.4)",
+              },
+            }}
+          >
+            <Icon>edit</Icon>
+          </IconButton>
+        </Tooltip>
       </MDBox>
     ),
   }));
@@ -290,47 +388,109 @@ function Promotores() {
       <MDBox pt={6} pb={3}>
         <Grid container spacing={6}>
           <Grid item xs={12}>
-            <Card>
-              <MDBox
-                mx={2}
-                mt={-3}
-                py={3}
-                px={2}
-                variant="gradient"
-                bgColor="info"
-                borderRadius="lg"
-                coloredShadow="info"
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
+            <Fade in timeout={600}>
+              <Card
+                sx={{
+                  overflow: "visible",
+                  boxShadow: "0 4px 20px 0 rgba(0,0,0,0.12)",
+                  transition: "all 0.3s",
+                  "&:hover": {
+                    boxShadow: "0 8px 30px 0 rgba(0,0,0,0.15)",
+                  },
+                }}
               >
-                <MDTypography variant="h6" color="white">
-                  Gestión de Usuarios
-                </MDTypography>
-                <MDButton variant="contained" color="white" onClick={handleOpenCreateModal}>
-                  <Icon>add</Icon>&nbsp; Nuevo Usuario
-                </MDButton>
-              </MDBox>
-              <MDBox pt={3}>
-                {loading ? (
-                  <MDBox display="flex" justifyContent="center" p={3}>
-                    <CircularProgress color="info" />
+                <MDBox
+                  mx={2}
+                  mt={-3}
+                  py={3}
+                  px={2}
+                  variant="gradient"
+                  bgColor="info"
+                  borderRadius="lg"
+                  coloredShadow="info"
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  sx={{
+                    background: "linear-gradient(195deg, #49a3f1, #1A73E8)",
+                    transition: "all 0.3s ease-in-out",
+                    "&:hover": {
+                      transform: "translateY(-2px)",
+                      boxShadow:
+                        "0 14px 26px -12px rgba(26, 115, 232, 0.42), 0 4px 23px 0px rgba(0, 0, 0, 0.12), 0 8px 10px -5px rgba(26, 115, 232, 0.2)",
+                    },
+                  }}
+                >
+                  <MDBox display="flex" alignItems="center" gap={2}>
+                    <Icon sx={{ fontSize: 32, color: "white" }}>people</Icon>
+                    <MDBox>
+                      <MDTypography variant="h5" fontWeight="bold" color="white">
+                        Gestión de Usuarios
+                      </MDTypography>
+                      <MDTypography variant="caption" color="white" opacity={0.8}>
+                        {users.length} usuario{users.length !== 1 ? "s" : ""} registrado
+                        {users.length !== 1 ? "s" : ""}
+                      </MDTypography>
+                    </MDBox>
                   </MDBox>
-                ) : error ? (
-                  <MDBox p={3}>
-                    <Alert severity="error">{error}</Alert>
-                  </MDBox>
-                ) : (
-                  <DataTable
-                    table={{ columns, rows }}
-                    isSorted={false}
-                    entriesPerPage={false}
-                    showTotalEntries={false}
-                    noEndBorder
-                  />
-                )}
-              </MDBox>
-            </Card>
+                  <Zoom in timeout={800}>
+                    <MDButton
+                      variant="contained"
+                      color="white"
+                      onClick={handleOpenCreateModal}
+                      sx={{
+                        transition: "all 0.3s",
+                        "&:hover": {
+                          transform: "translateY(-2px) scale(1.05)",
+                          boxShadow: "0 7px 14px rgba(0, 0, 0, 0.18)",
+                        },
+                      }}
+                    >
+                      <Icon>add</Icon>&nbsp; Nuevo Usuario
+                    </MDButton>
+                  </Zoom>
+                </MDBox>
+                <MDBox pt={3}>
+                  {loading ? (
+                    <Fade in>
+                      <MDBox display="flex" flexDirection="column" alignItems="center" p={5}>
+                        <CircularProgress color="info" size={60} thickness={4} />
+                        <MDTypography variant="button" color="text" mt={2}>
+                          Cargando usuarios...
+                        </MDTypography>
+                      </MDBox>
+                    </Fade>
+                  ) : error ? (
+                    <Fade in>
+                      <MDBox p={3}>
+                        <Alert
+                          severity="error"
+                          icon={<Icon>error_outline</Icon>}
+                          sx={{
+                            animation: "shake 0.5s",
+                            "@keyframes shake": {
+                              "0%, 100%": { transform: "translateX(0)" },
+                              "10%, 30%, 50%, 70%, 90%": { transform: "translateX(-5px)" },
+                              "20%, 40%, 60%, 80%": { transform: "translateX(5px)" },
+                            },
+                          }}
+                        >
+                          {error}
+                        </Alert>
+                      </MDBox>
+                    </Fade>
+                  ) : (
+                    <DataTable
+                      table={{ columns, rows }}
+                      isSorted={false}
+                      entriesPerPage={false}
+                      showTotalEntries={false}
+                      noEndBorder
+                    />
+                  )}
+                </MDBox>
+              </Card>
+            </Fade>
           </Grid>
         </Grid>
       </MDBox>

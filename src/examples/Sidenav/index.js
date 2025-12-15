@@ -13,7 +13,7 @@ Coded by www.creative-tim.com
 * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 // react-router-dom components
 import { useLocation, NavLink, useNavigate } from "react-router-dom";
@@ -22,10 +22,15 @@ import { useLocation, NavLink, useNavigate } from "react-router-dom";
 import PropTypes from "prop-types";
 
 // @mui material components
+import Fade from "@mui/material/Fade";
+import Zoom from "@mui/material/Zoom";
+
+// @mui material components
 import List from "@mui/material/List";
 import Divider from "@mui/material/Divider";
 import Link from "@mui/material/Link";
 import Icon from "@mui/material/Icon";
+import CircularProgress from "@mui/material/CircularProgress";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
@@ -157,23 +162,54 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
           right={0}
           p={1.625}
           onClick={closeSidenav}
-          sx={{ cursor: "pointer" }}
+          sx={{
+            cursor: "pointer",
+            transition: "all 0.3s ease",
+            "&:hover": {
+              transform: "rotate(90deg)",
+              color: "error.main",
+            },
+          }}
         >
           <MDTypography variant="h6" color="secondary">
             <Icon sx={{ fontWeight: "bold" }}>close</Icon>
           </MDTypography>
         </MDBox>
-        <MDBox component={NavLink} to="/" display="flex" alignItems="center">
-          {brand && <MDBox component="img" src={brand} alt="Brand" width="2rem" />}
+        <Zoom in timeout={500}>
           <MDBox
-            width={!brandName && "100%"}
-            sx={(theme) => sidenavLogoLabel(theme, { miniSidenav })}
+            component={NavLink}
+            to="/"
+            display="flex"
+            alignItems="center"
+            sx={{
+              transition: "all 0.3s ease",
+              "&:hover": {
+                transform: "scale(1.05)",
+              },
+            }}
           >
-            <MDTypography component="h6" variant="button" fontWeight="medium" color={textColor}>
-              {brandName}
-            </MDTypography>
+            {brand && (
+              <MDBox
+                component="img"
+                src={brand}
+                alt="Brand"
+                width="2rem"
+                sx={{
+                  transition: "transform 0.3s ease",
+                  "&:hover": { transform: "rotate(360deg)" },
+                }}
+              />
+            )}
+            <MDBox
+              width={!brandName && "100%"}
+              sx={(theme) => sidenavLogoLabel(theme, { miniSidenav })}
+            >
+              <MDTypography component="h6" variant="button" fontWeight="medium" color={textColor}>
+                {brandName}
+              </MDTypography>
+            </MDBox>
           </MDBox>
-        </MDBox>
+        </Zoom>
       </MDBox>
       <Divider
         light={
@@ -181,7 +217,9 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
           (darkMode && !transparentSidenav && whiteSidenav)
         }
       />
-      <List>{renderRoutes}</List>
+      <Fade in timeout={700}>
+        <List sx={{ py: 1 }}>{renderRoutes}</List>
+      </Fade>
       <MDBox px={2} mt="auto" mb={2}>
         <LogoutButton />
       </MDBox>
@@ -195,43 +233,78 @@ function LogoutButton() {
   const { logout, user } = useAuth();
   const [controller] = useMaterialUIController();
   const { miniSidenav, darkMode } = controller;
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
+    setIsLoggingOut(true);
     try {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       await logout();
       navigate("/authentication/sign-in");
     } catch (error) {
       console.error("Error al cerrar sesión:", error);
       navigate("/authentication/sign-in");
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
   if (!user) return null;
 
   return (
-    <>
-      <Divider light={!darkMode} />
-      <MDBox pt={2} pb={1}>
-        <MDBox px={2} mb={1}>
-          <MDTypography variant="caption" color="text" fontWeight="medium">
-            {user.name}
-          </MDTypography>
-          <MDTypography variant="caption" color="text" display="block">
-            {user.role_display || user.role}
-          </MDTypography>
+    <Fade in timeout={900}>
+      <MDBox>
+        <Divider light={!darkMode} />
+        <MDBox pt={2} pb={1}>
+          <MDBox
+            px={2}
+            mb={1}
+            sx={{
+              transition: "all 0.3s ease",
+              "&:hover": { transform: "translateX(4px)" },
+            }}
+          >
+            <MDTypography variant="caption" color="text" fontWeight="medium">
+              {user.name}
+            </MDTypography>
+            <MDTypography variant="caption" color="text" display="block">
+              {user.role_display || user.role}
+            </MDTypography>
+          </MDBox>
+          <MDButton
+            variant="gradient"
+            color="error"
+            fullWidth
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            sx={{
+              textTransform: "none",
+              transition: "all 0.3s ease",
+              "&:hover": {
+                transform: "translateY(-2px)",
+                boxShadow: "0 8px 16px rgba(244, 67, 54, 0.3)",
+              },
+              "&.Mui-disabled": {
+                opacity: 0.8,
+                background: "linear-gradient(195deg, #EC407A, #D81B60)",
+              },
+            }}
+          >
+            {isLoggingOut ? (
+              <>
+                <CircularProgress size={16} sx={{ color: "white", mr: 1 }} thickness={5} />
+                {!miniSidenav && "Cerrando sesión..."}
+              </>
+            ) : (
+              <>
+                <Icon sx={{ mr: 1 }}>logout</Icon>
+                {!miniSidenav && "Cerrar Sesión"}
+              </>
+            )}
+          </MDButton>
         </MDBox>
-        <MDButton
-          variant="gradient"
-          color="error"
-          fullWidth
-          onClick={handleLogout}
-          sx={{ textTransform: "none" }}
-        >
-          <Icon sx={{ mr: 1 }}>logout</Icon>
-          {!miniSidenav && "Cerrar Sesión"}
-        </MDButton>
       </MDBox>
-    </>
+    </Fade>
   );
 }
 

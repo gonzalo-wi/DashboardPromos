@@ -4,7 +4,7 @@
  */
 
 import config from "../config";
-import { getToken } from "./authService";
+import { getToken, getCurrentUser } from "./authService";
 
 const API_BASE_URL = config.api.baseUrl;
 
@@ -17,6 +17,23 @@ const getAuthHeaders = () => {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
   };
+};
+
+/**
+ * Detecta si el usuario actual es superadmin
+ */
+const isSuperAdmin = () => {
+  const user = getCurrentUser();
+  return user && user.role === "superadmin";
+};
+
+/**
+ * Obtiene el prefijo del endpoint según el rol del usuario
+ * superadmin: /superadmin/admins
+ * admin: /admin/users
+ */
+const getEndpointPrefix = () => {
+  return isSuperAdmin() ? "superadmin/admins" : "admin/users";
 };
 
 /**
@@ -45,13 +62,27 @@ export const getUsers = async () => {
 
 /**
  * Crear nuevo usuario
+ * Usa /admin/users o /superadmin/admins según el rol del usuario logueado
+ * Convierte role_id a role_name antes de enviar
  */
 export const createUser = async (userData) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/admin/users`, {
+    // Convertir role_id a role_name si existe
+    const dataToSend = { ...userData };
+    if (dataToSend.role_id) {
+      const roles = await getRoles();
+      const selectedRole = roles.find((r) => r.id === dataToSend.role_id);
+      if (selectedRole) {
+        dataToSend.role_name = selectedRole.name;
+      }
+      delete dataToSend.role_id;
+    }
+
+    const endpoint = getEndpointPrefix();
+    const response = await fetch(`${API_BASE_URL}/${endpoint}`, {
       method: "POST",
       headers: getAuthHeaders(),
-      body: JSON.stringify(userData),
+      body: JSON.stringify(dataToSend),
     });
 
     const data = await response.json();
@@ -74,13 +105,28 @@ export const createUser = async (userData) => {
 
 /**
  * Actualizar usuario existente
+ * Usa /admin/users/{id} o /superadmin/admins/{id} según el rol del usuario logueado
+ * Convierte role_id a role_name antes de enviar
  */
 export const updateUser = async (userId, userData) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+    // Convertir role_id a role_name si existe
+    const dataToSend = { ...userData };
+    if (dataToSend.role_id) {
+      // Obtener el nombre del rol desde getRoles()
+      const roles = await getRoles();
+      const selectedRole = roles.find((r) => r.id === dataToSend.role_id);
+      if (selectedRole) {
+        dataToSend.role_name = selectedRole.name;
+      }
+      delete dataToSend.role_id;
+    }
+
+    const endpoint = getEndpointPrefix();
+    const response = await fetch(`${API_BASE_URL}/${endpoint}/${userId}`, {
       method: "PUT",
       headers: getAuthHeaders(),
-      body: JSON.stringify(userData),
+      body: JSON.stringify(dataToSend),
     });
 
     const data = await response.json();

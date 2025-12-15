@@ -4,14 +4,14 @@
 =========================================================
 */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import PropTypes from "prop-types";
 import { GoogleMap, LoadScript, Marker, Polyline, InfoWindow } from "@react-google-maps/api";
 import MDBox from "components/MDBox";
 import MDTypography from "components/MDTypography";
 import config from "config";
 
-function MapaPromotores({ promotores }) {
+function MapaPromotores({ promotores, selectedPromotorId }) {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [map, setMap] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -23,16 +23,27 @@ function MapaPromotores({ promotores }) {
     borderRadius: "8px",
   };
 
-  // Centro del mapa (Buenos Aires)
+  // Centro del mapa (ubicación por defecto)
   const center = {
-    lat: -34.603722,
-    lng: -58.381592,
+    lat: -34.63316869327277,
+    lng: -58.532468827503074,
   };
 
   const onLoad = useCallback((map) => {
     setMap(map);
     setIsLoaded(true);
   }, []);
+
+  // Centrar mapa en el promotor seleccionado
+  useEffect(() => {
+    if (map && selectedPromotorId) {
+      const promotor = promotores.find((p) => p.id === selectedPromotorId);
+      if (promotor && promotor.posicion) {
+        map.panTo(promotor.posicion);
+        map.setZoom(15);
+      }
+    }
+  }, [selectedPromotorId, map, promotores]);
 
   // Si no hay API Key configurada, mostrar mensaje
   if (!apiKey) {
@@ -184,6 +195,7 @@ MapaPromotores.propTypes = {
       clientesHoy: PropTypes.number.isRequired,
     })
   ).isRequired,
+  selectedPromotorId: PropTypes.number,
 };
 
 export default MapaPromotores;
