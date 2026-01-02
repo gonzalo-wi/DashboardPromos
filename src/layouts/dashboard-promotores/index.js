@@ -4,13 +4,14 @@
 =========================================================
 */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Grid from "@mui/material/Grid";
 import Card from "@mui/material/Card";
 import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
+import TextField from "@mui/material/TextField";
 import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
 import Icon from "@mui/material/Icon";
@@ -48,6 +49,10 @@ function DashboardPromotores() {
   // Filtros
   const [selectedUser, setSelectedUser] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
+  const [selectedFechaEntrega, setSelectedFechaEntrega] = useState("");
+  const [selectedPromocion, setSelectedPromocion] = useState("");
+  const [selectedReparto, setSelectedReparto] = useState("");
+  const [repartoInput, setRepartoInput] = useState(""); // Valor temporal del input
   const [currentPage, setCurrentPage] = useState(1);
 
   // Datos de paginación
@@ -58,17 +63,6 @@ function DashboardPromotores() {
     last_page: 1,
   });
 
-  // Cargar usuarios y altas al montar
-  useEffect(() => {
-    loadUsers();
-    loadAltas();
-  }, []);
-
-  // Recargar altas cuando cambian los filtros
-  useEffect(() => {
-    loadAltas();
-  }, [selectedUser, selectedDate, currentPage]);
-
   const loadUsers = async () => {
     try {
       const data = await getUsers();
@@ -78,7 +72,7 @@ function DashboardPromotores() {
     }
   };
 
-  const loadAltas = async () => {
+  const loadAltas = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -90,21 +84,72 @@ function DashboardPromotores() {
       if (selectedUser) filters.user_id = selectedUser;
       if (selectedDate) filters.fecha = selectedDate;
 
+      // Para fecha de entrega, si es "En 7 días", usar rango desde hoy hasta 7 días
+      if (selectedFechaEntrega) {
+        const today = new Date().toISOString().split("T")[0];
+        const in7Days = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+
+        if (selectedFechaEntrega === "rango_7_dias") {
+          // Filtrar desde hoy hasta dentro de 7 días
+          filters.fecha_pedido_desde = today;
+          filters.fecha_pedido_hasta = in7Days;
+        } else {
+          // Fecha específica (Hoy)
+          filters.fecha_pedido = selectedFechaEntrega;
+        }
+      }
+
+      if (selectedPromocion) filters.tipo_promocion_id = selectedPromocion;
+      if (selectedReparto) filters.nro_rto = selectedReparto;
+
       const response = await getAllAltas(filters);
 
-      setAltas(response.data || []);
+      // Si la respuesta es un array directamente, usarlo. Si es un objeto con data, usar data
+      let altasData = Array.isArray(response) ? response : response.data || [];
+
+      // Filtrar en el frontend si el backend no soporta los filtros de rango
+      if (selectedFechaEntrega === "rango_7_dias") {
+        const today = new Date().toISOString().split("T")[0];
+        const in7Days = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+
+        altasData = altasData.filter((alta) => {
+          if (!alta.fecha_pedido) return false;
+          const fechaPedido = new Date(alta.fecha_pedido).toISOString().split("T")[0];
+          return fechaPedido >= today && fechaPedido <= in7Days;
+        });
+      }
+
+      setAltas(altasData);
       setPagination({
-        total: response.total || 0,
+        total: Array.isArray(response) ? response.length : response.total || 0,
         per_page: response.per_page || 50,
         current_page: response.current_page || 1,
         last_page: response.last_page || 1,
       });
     } catch (err) {
+      console.error("❌ Error al cargar altas:", err);
       setError(err.message || "Error al cargar altas");
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    selectedUser,
+    selectedDate,
+    selectedFechaEntrega,
+    selectedPromocion,
+    selectedReparto,
+    currentPage,
+  ]);
+
+  // Cargar usuarios al montar
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  // Recargar altas cuando cambian los filtros
+  useEffect(() => {
+    loadAltas();
+  }, [loadAltas]);
 
   const handleUserChange = (event) => {
     setSelectedUser(event.target.value);
@@ -116,9 +161,41 @@ function DashboardPromotores() {
     setCurrentPage(1);
   };
 
+  const handleFechaEntregaChange = (event) => {
+    setSelectedFechaEntrega(event.target.value);
+    setCurrentPage(1);
+  };
+
+  const handlePromocionChange = (event) => {
+    setSelectedPromocion(event.target.value);
+    setCurrentPage(1);
+  };
+
+  const handleRepartoInputChange = (event) => {
+    setRepartoInput(event.target.value);
+  };
+
+  const handleRepartoKeyPress = (event) => {
+    if (event.key === "Enter") {
+      setSelectedReparto(repartoInput);
+      setCurrentPage(1);
+    }
+  };
+
+  const handleRepartoBlur = () => {
+    if (repartoInput !== selectedReparto) {
+      setSelectedReparto(repartoInput);
+      setCurrentPage(1);
+    }
+  };
+
   const handleClearFilters = () => {
     setSelectedUser("");
     setSelectedDate("");
+    setSelectedFechaEntrega("");
+    setSelectedPromocion("");
+    setSelectedReparto("");
+    setRepartoInput("");
     setCurrentPage(1);
   };
 
@@ -136,23 +213,37 @@ function DashboardPromotores() {
 
   // Calcular métricas
   const totalAltas = pagination.total;
+
+  // Obtener la fecha de hoy en formato YYYY-MM-DD
+  const hoy = new Date().toISOString().split("T")[0];
+
   const altasHoy = altas.filter((alta) => {
-    const today = new Date().toISOString().split("T")[0];
-    const altaDate = alta.fecha_pedido || alta.created_at?.split("T")[0];
-    return altaDate === today;
+    // Intentar obtener la fecha del alta de varios campos posibles
+    let altaDate = null;
+
+    if (alta.fecha_pedido) {
+      // Si existe fecha_pedido, usarla
+      altaDate = new Date(alta.fecha_pedido).toISOString().split("T")[0];
+    } else if (alta.created_at) {
+      // Si existe created_at, usarla
+      altaDate = new Date(alta.created_at).toISOString().split("T")[0];
+    }
+
+    return altaDate === hoy;
   }).length;
 
   const usuariosActivos = new Set(altas.map((alta) => alta.user_promo?.iduser_promo)).size;
 
   // Preparar columnas de la tabla
   const columns = [
-    { Header: "Fecha/Hora", accessor: "fecha", width: "12%" },
-    { Header: "Cliente", accessor: "cliente", width: "20%" },
-    { Header: "Dirección", accessor: "direccion", width: "18%" },
-    { Header: "Teléfono", accessor: "telefono", width: "12%" },
-    { Header: "Promotor", accessor: "promotor", width: "15%" },
-    { Header: "Promoción", accessor: "promocion", width: "15%" },
-    { Header: "Ruta", accessor: "ruta", width: "8%" },
+    { Header: "Fecha/Hora", accessor: "fecha", width: "11%" },
+    { Header: "Fecha Entrega", accessor: "fechaEntrega", width: "11%" },
+    { Header: "Cliente", accessor: "cliente", width: "18%" },
+    { Header: "Dirección", accessor: "direccion", width: "16%" },
+    { Header: "Teléfono", accessor: "telefono", width: "10%" },
+    { Header: "Promotor", accessor: "promotor", width: "13%" },
+    { Header: "Promoción", accessor: "promocion", width: "13%" },
+    { Header: "Reparto", accessor: "reparto", width: "8%" },
   ];
 
   // Preparar filas de la tabla
@@ -167,6 +258,15 @@ function DashboardPromotores() {
       hour: "2-digit",
       minute: "2-digit",
     });
+
+    // Fecha de entrega
+    const fechaEntrega = alta.fecha_pedido
+      ? new Date(alta.fecha_pedido).toLocaleDateString("es-AR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })
+      : "-";
 
     return {
       fecha: (
@@ -187,6 +287,16 @@ function DashboardPromotores() {
               {horaStr}
             </MDTypography>
           </MDBox>
+        </MDBox>
+      ),
+      fechaEntrega: (
+        <MDBox display="flex" alignItems="center" gap={1}>
+          <Icon fontSize="small" sx={{ color: "success.main" }}>
+            local_shipping
+          </Icon>
+          <MDTypography variant="caption" fontWeight="medium">
+            {fechaEntrega}
+          </MDTypography>
         </MDBox>
       ),
       cliente: (
@@ -262,7 +372,7 @@ function DashboardPromotores() {
           }}
         />
       ),
-      ruta: (
+      reparto: (
         <Chip
           label={alta.nro_rto}
           size="small"
@@ -280,6 +390,7 @@ function DashboardPromotores() {
   const today = new Date().toISOString().split("T")[0];
   const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
+  const in7Days = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
 
   return (
     <DashboardLayout>
@@ -484,13 +595,99 @@ function DashboardPromotores() {
                           <em>Todas las fechas</em>
                         </MenuItem>
                         <MenuItem value={today}>Hoy</MenuItem>
-                        <MenuItem value={yesterday}>Ayer</MenuItem>
-                        <MenuItem value={weekAgo}>Hace 7 días</MenuItem>
+                        <MenuItem value={in7Days}>En 7 días</MenuItem>
                       </Select>
                     </FormControl>
                   </Zoom>
 
-                  {(selectedUser || selectedDate) && (
+                  <Zoom in timeout={1000}>
+                    <FormControl
+                      sx={{
+                        minWidth: 200,
+                        transition: "all 0.3s",
+                        "&:hover": { transform: "translateY(-2px)" },
+                      }}
+                    >
+                      <InputLabel id="fecha-entrega-filter-label">Fecha de Entrega</InputLabel>
+                      <Select
+                        labelId="fecha-entrega-filter-label"
+                        value={selectedFechaEntrega}
+                        label="Fecha de Entrega"
+                        onChange={handleFechaEntregaChange}
+                        sx={{ height: "45px" }}
+                      >
+                        <MenuItem value="">
+                          <em>Todas las fechas</em>
+                        </MenuItem>
+                        <MenuItem value={today}>Hoy</MenuItem>
+                        <MenuItem value="rango_7_dias">Próximos 7 días</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Zoom>
+
+                  <Zoom in timeout={1200}>
+                    <FormControl
+                      sx={{
+                        minWidth: 180,
+                        transition: "all 0.3s",
+                        "&:hover": { transform: "translateY(-2px)" },
+                      }}
+                    >
+                      <InputLabel id="promocion-filter-label">Promoción</InputLabel>
+                      <Select
+                        labelId="promocion-filter-label"
+                        value={selectedPromocion}
+                        label="Promoción"
+                        onChange={handlePromocionChange}
+                        sx={{ height: "45px" }}
+                      >
+                        <MenuItem value="">
+                          <em>Todas</em>
+                        </MenuItem>
+                        {Array.from(
+                          new Set(
+                            altas
+                              .map((a) => a.promotion?.idtipo_promocion)
+                              .filter((id) => id !== null && id !== undefined)
+                          )
+                        ).map((id) => {
+                          const promo = altas.find(
+                            (a) => a.promotion?.idtipo_promocion === id
+                          )?.promotion;
+                          return (
+                            <MenuItem key={id} value={id}>
+                              {promo?.name || `Promoción ${id}`}
+                            </MenuItem>
+                          );
+                        })}
+                      </Select>
+                    </FormControl>
+                  </Zoom>
+
+                  <Zoom in timeout={1400}>
+                    <TextField
+                      label="Reparto"
+                      value={repartoInput}
+                      onChange={handleRepartoInputChange}
+                      onKeyPress={handleRepartoKeyPress}
+                      onBlur={handleRepartoBlur}
+                      placeholder="Ej: 1, 2, 3... (Enter para filtrar)"
+                      sx={{
+                        minWidth: 150,
+                        transition: "all 0.3s",
+                        "&:hover": { transform: "translateY(-2px)" },
+                      }}
+                      InputProps={{
+                        sx: { height: "45px" },
+                      }}
+                    />
+                  </Zoom>
+
+                  {(selectedUser ||
+                    selectedDate ||
+                    selectedFechaEntrega ||
+                    selectedPromocion ||
+                    selectedReparto) && (
                     <Zoom in>
                       <MDButton
                         variant="outlined"

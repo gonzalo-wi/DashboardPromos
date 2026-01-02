@@ -77,7 +77,8 @@ function EfectividadPromotores() {
       // Cargar todas las altas (sin límite de páginas para análisis completo)
       const altasData = await getAllAltas({ page: 1 });
       console.log("📋 Altas cargadas:", altasData);
-      setAltas(altasData.data || []);
+      // Si altasData es un array directamente, usarlo. Si tiene .data, usar altasData.data
+      setAltas(Array.isArray(altasData) ? altasData : altasData.data || []);
     } catch (err) {
       setError(err.message || "Error al cargar datos");
     } finally {

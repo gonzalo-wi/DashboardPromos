@@ -39,6 +39,7 @@ Coded by www.creative-tim.com
 import Promotores from "layouts/promotores";
 import DashboardPromotores from "layouts/dashboard-promotores";
 import MapaPromotores from "layouts/mapa-promotores";
+import MapaAltas from "layouts/mapa-altas";
 import EfectividadPromotores from "layouts/efectividad-promotores";
 import SignIn from "layouts/authentication/sign-in";
 
@@ -82,6 +83,18 @@ const routes = [
     component: (
       <PrivateRoute requiredPermission="view_altas">
         <MapaPromotores />
+      </PrivateRoute>
+    ),
+  },
+  {
+    type: "collapse",
+    name: "Mapa de Altas",
+    key: "mapa-altas",
+    icon: <Icon fontSize="small">place</Icon>,
+    route: "/mapa-altas",
+    component: (
+      <PrivateRoute requiredPermission="view_altas">
+        <MapaAltas />
       </PrivateRoute>
     ),
   },

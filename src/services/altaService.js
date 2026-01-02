@@ -38,9 +38,13 @@ export const getAllAltas = async (filters = {}) => {
 
     if (filters.user_id) params.append("user_id", filters.user_id);
     if (filters.fecha) params.append("fecha", filters.fecha);
+    if (filters.fecha_pedido) params.append("fecha_pedido", filters.fecha_pedido);
+    if (filters.fecha_pedido_desde) params.append("fecha_pedido_desde", filters.fecha_pedido_desde);
+    if (filters.fecha_pedido_hasta) params.append("fecha_pedido_hasta", filters.fecha_pedido_hasta);
     if (filters.fecha_desde) params.append("fecha_desde", filters.fecha_desde);
     if (filters.fecha_hasta) params.append("fecha_hasta", filters.fecha_hasta);
     if (filters.tipo_promocion_id) params.append("tipo_promocion_id", filters.tipo_promocion_id);
+    if (filters.nro_rto) params.append("nro_rto", filters.nro_rto);
     if (filters.page) params.append("page", filters.page);
 
     const queryString = params.toString();
@@ -56,7 +60,8 @@ export const getAllAltas = async (filters = {}) => {
       throw new Error(error.message || "Error al obtener altas");
     }
 
-    return await response.json();
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error("❌ Error al obtener altas:", error);
     throw error;
