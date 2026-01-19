@@ -48,6 +48,7 @@ function MapaAltasView() {
   const [selectedDate, setSelectedDate] = useState(""); // Iniciar vacío para mostrar todas
   const [selectedUser, setSelectedUser] = useState("todos");
   const [estadoFilter, setEstadoFilter] = useState("todos");
+  const [consolidadaFilter, setConsolidadaFilter] = useState("todos");
 
   // Cargar usuarios al montar
   useEffect(() => {
@@ -110,9 +111,13 @@ function MapaAltasView() {
 
   // Filtrar altas
   const altasFiltradas = altas.filter((alta) => {
-    // Filtro por visitado (estado)
+    // Filtro por visitado (estado de entrega)
     if (estadoFilter === "pendientes" && alta.visitado !== 0) return false;
     if (estadoFilter === "entregados" && alta.visitado !== 1) return false;
+
+    // Filtro por consolidada (venta concretada)
+    if (consolidadaFilter === "consolidadas" && alta.visita_consolidada !== 1) return false;
+    if (consolidadaFilter === "no_consolidadas" && alta.visita_consolidada !== 0) return false;
 
     // Filtro por alta seleccionada
     if (!showAll && selectedAlta && alta.id_alta_cliente_promo !== selectedAlta) return false;
@@ -131,13 +136,30 @@ function MapaAltasView() {
     (a) => a.visitado === 0 || a.visitado === null || a.visitado === undefined
   ).length;
   const entregados = altas.filter((a) => a.visitado === 1).length;
+
+  // Contar por consolidación (venta concretada)
+  const consolidadas = altas.filter((a) => a.visita_consolidada === 1).length;
+  const noConsolidadas = altas.filter(
+    (a) =>
+      a.visita_consolidada === 0 ||
+      a.visita_consolidada === null ||
+      a.visita_consolidada === undefined
+  ).length;
+
   const conCoordenadas = altas.filter((a) => {
     const lat = parseFloat(a.latitud);
     const lng = parseFloat(a.longitud);
     return !isNaN(lat) && !isNaN(lng);
   }).length;
 
-  console.log("📊 Estadísticas:", { total: altas.length, pendientes, entregados, conCoordenadas });
+  console.log("📊 Estadísticas:", {
+    total: altas.length,
+    pendientes,
+    entregados,
+    consolidadas,
+    noConsolidadas,
+    conCoordenadas,
+  });
 
   return (
     <DashboardLayout>
@@ -244,10 +266,10 @@ function MapaAltasView() {
                       <Zoom in timeout={800}>
                         <MDBox mb={2}>
                           <FormControl fullWidth size="small">
-                            <InputLabel>Estado</InputLabel>
+                            <InputLabel>Estado Entrega</InputLabel>
                             <Select
                               value={estadoFilter}
-                              label="Estado"
+                              label="Estado Entrega"
                               onChange={(e) => setEstadoFilter(e.target.value)}
                             >
                               <MenuItem value="todos">Todos</MenuItem>
@@ -264,6 +286,39 @@ function MapaAltasView() {
                                   label="Entregados"
                                   color="success"
                                   size="small"
+                                  sx={{ fontSize: "0.75rem" }}
+                                />
+                              </MenuItem>
+                            </Select>
+                          </FormControl>
+                        </MDBox>
+                      </Zoom>
+
+                      <Zoom in timeout={850}>
+                        <MDBox mb={2}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>Venta Consolidada</InputLabel>
+                            <Select
+                              value={consolidadaFilter}
+                              label="Venta Consolidada"
+                              onChange={(e) => setConsolidadaFilter(e.target.value)}
+                            >
+                              <MenuItem value="todos">Todas</MenuItem>
+                              <MenuItem value="consolidadas">
+                                <Chip
+                                  label="Con Venta"
+                                  color="success"
+                                  size="small"
+                                  icon={<Icon fontSize="small">check_circle</Icon>}
+                                  sx={{ fontSize: "0.75rem" }}
+                                />
+                              </MenuItem>
+                              <MenuItem value="no_consolidadas">
+                                <Chip
+                                  label="Sin Venta"
+                                  color="warning"
+                                  size="small"
+                                  icon={<Icon fontSize="small">cancel</Icon>}
                                   sx={{ fontSize: "0.75rem" }}
                                 />
                               </MenuItem>
@@ -296,9 +351,9 @@ function MapaAltasView() {
                       {/* Resumen */}
                       <MDBox mt={2} p={2} bgcolor="grey.100" borderRadius="lg">
                         <MDTypography variant="caption" fontWeight="bold" mb={1}>
-                          Resumen
+                          Resumen - Entregas
                         </MDTypography>
-                        <MDBox display="flex" justifyContent="space-between" mt={1}>
+                        <MDBox display="flex" justifyContent="space-between" mt={1} mb={2}>
                           <Chip
                             label={`${pendientes} Pendientes`}
                             color="error"
@@ -310,6 +365,23 @@ function MapaAltasView() {
                             color="success"
                             size="small"
                             icon={<Icon fontSize="small">check_circle</Icon>}
+                          />
+                        </MDBox>
+                        <MDTypography variant="caption" fontWeight="bold" mb={1}>
+                          Resumen - Ventas
+                        </MDTypography>
+                        <MDBox display="flex" justifyContent="space-between" mt={1}>
+                          <Chip
+                            label={`${consolidadas} Con Venta`}
+                            color="success"
+                            size="small"
+                            icon={<Icon fontSize="small">monetization_on</Icon>}
+                          />
+                          <Chip
+                            label={`${noConsolidadas} Sin Venta`}
+                            color="warning"
+                            size="small"
+                            icon={<Icon fontSize="small">money_off</Icon>}
                           />
                         </MDBox>
                       </MDBox>
@@ -358,23 +430,49 @@ function MapaAltasView() {
                                   justifyContent="space-between"
                                 >
                                   <MDBox flex={1}>
-                                    <MDTypography
-                                      variant="button"
-                                      fontWeight="bold"
-                                      fontSize="0.75rem"
-                                    >
-                                      {alta.nombre_completo}
-                                    </MDTypography>
+                                    <MDBox display="flex" alignItems="center" gap={0.5} mb={0.5}>
+                                      <MDTypography
+                                        variant="button"
+                                        fontWeight="bold"
+                                        fontSize="0.75rem"
+                                      >
+                                        {alta.nombre_completo}
+                                      </MDTypography>
+                                      {alta.visita_consolidada === 1 && (
+                                        <Icon
+                                          fontSize="small"
+                                          sx={{ color: "success.main", fontSize: "14px" }}
+                                        >
+                                          attach_money
+                                        </Icon>
+                                      )}
+                                    </MDBox>
                                     <MDTypography variant="caption" color="text" display="block">
                                       {alta.direccion}
                                     </MDTypography>
                                   </MDBox>
-                                  <Chip
-                                    label={alta.visitado === 1 ? "OK" : "P"}
-                                    color={alta.visitado === 1 ? "success" : "error"}
-                                    size="small"
-                                    sx={{ fontSize: "0.65rem", height: "20px", minWidth: "30px" }}
-                                  />
+                                  <MDBox display="flex" flexDirection="column" gap={0.5}>
+                                    <Chip
+                                      label={alta.visitado === 1 ? "OK" : "P"}
+                                      color={alta.visitado === 1 ? "success" : "error"}
+                                      size="small"
+                                      sx={{ fontSize: "0.65rem", height: "18px", minWidth: "30px" }}
+                                    />
+                                    {alta.visitado === 1 && (
+                                      <Chip
+                                        label={alta.visita_consolidada === 1 ? "$" : "X"}
+                                        color={
+                                          alta.visita_consolidada === 1 ? "success" : "warning"
+                                        }
+                                        size="small"
+                                        sx={{
+                                          fontSize: "0.65rem",
+                                          height: "18px",
+                                          minWidth: "30px",
+                                        }}
+                                      />
+                                    )}
+                                  </MDBox>
                                 </MDBox>
                               </MDBox>
                             </Zoom>
@@ -405,6 +503,9 @@ function MapaAltasView() {
                   </MDBox>
                 </MDBox>
                 <MDBox p={2}>
+                  <MDTypography variant="caption" fontWeight="bold" mb={1} display="block">
+                    Marcadores en el mapa:
+                  </MDTypography>
                   <MDBox display="flex" alignItems="center" mb={1.5}>
                     <MDBox
                       width={20}
@@ -414,9 +515,9 @@ function MapaAltasView() {
                       mr={1.5}
                       border="2px solid white"
                     />
-                    <MDTypography variant="caption">Entregado</MDTypography>
+                    <MDTypography variant="caption">Con Venta Consolidada</MDTypography>
                   </MDBox>
-                  <MDBox display="flex" alignItems="center">
+                  <MDBox display="flex" alignItems="center" mb={2}>
                     <MDBox
                       width={20}
                       height={20}
@@ -425,7 +526,47 @@ function MapaAltasView() {
                       mr={1.5}
                       border="2px solid white"
                     />
+                    <MDTypography variant="caption">Sin Venta</MDTypography>
+                  </MDBox>
+
+                  <MDTypography variant="caption" fontWeight="bold" mb={1} mt={2} display="block">
+                    Chips en la lista:
+                  </MDTypography>
+                  <MDBox display="flex" alignItems="center" gap={1} mb={1}>
+                    <Chip
+                      label="OK"
+                      color="success"
+                      size="small"
+                      sx={{ fontSize: "0.65rem", height: "18px", minWidth: "30px" }}
+                    />
+                    <MDTypography variant="caption">Entregado</MDTypography>
+                  </MDBox>
+                  <MDBox display="flex" alignItems="center" gap={1} mb={1}>
+                    <Chip
+                      label="P"
+                      color="error"
+                      size="small"
+                      sx={{ fontSize: "0.65rem", height: "18px", minWidth: "30px" }}
+                    />
                     <MDTypography variant="caption">Pendiente</MDTypography>
+                  </MDBox>
+                  <MDBox display="flex" alignItems="center" gap={1} mb={1}>
+                    <Chip
+                      label="$"
+                      color="success"
+                      size="small"
+                      sx={{ fontSize: "0.65rem", height: "18px", minWidth: "30px" }}
+                    />
+                    <MDTypography variant="caption">Con Venta</MDTypography>
+                  </MDBox>
+                  <MDBox display="flex" alignItems="center" gap={1}>
+                    <Chip
+                      label="X"
+                      color="warning"
+                      size="small"
+                      sx={{ fontSize: "0.65rem", height: "18px", minWidth: "30px" }}
+                    />
+                    <MDTypography variant="caption">Sin Venta</MDTypography>
                   </MDBox>
                 </MDBox>
               </Card>

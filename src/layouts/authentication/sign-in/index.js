@@ -129,7 +129,7 @@ function Basic() {
             }}
           >
             <MDTypography variant="h3" fontWeight="bold" color="white" mt={1}>
-              Altas de Promotores
+              AMP
             </MDTypography>
             <Zoom in timeout={1000}>
               <MDBox
@@ -154,7 +154,7 @@ function Basic() {
               </MDBox>
             </Zoom>
             <MDTypography variant="body2" color="white" opacity={0.8}>
-              Sistema de gestión y seguimiento
+              Aplicación móvil de promotores
             </MDTypography>
           </MDBox>
           <MDBox pt={4} pb={3} px={3}>

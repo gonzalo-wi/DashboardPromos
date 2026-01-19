@@ -36,7 +36,7 @@ import ComplexStatisticsCard from "examples/Cards/StatisticsCards/ComplexStatist
 import DataTable from "examples/Tables/DataTable";
 
 // Services
-import { getAllAltas } from "services/altaService";
+import { getAllAltas, getEstadisticasAltas } from "services/altaService";
 import { getUsers } from "services/userService";
 
 function DashboardPromotores() {
@@ -51,6 +51,7 @@ function DashboardPromotores() {
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedFechaEntrega, setSelectedFechaEntrega] = useState("");
   const [selectedPromocion, setSelectedPromocion] = useState("");
+  const [promocionInput, setPromocionInput] = useState(""); // Valor temporal del input
   const [selectedReparto, setSelectedReparto] = useState("");
   const [repartoInput, setRepartoInput] = useState(""); // Valor temporal del input
   const [currentPage, setCurrentPage] = useState(1);
@@ -63,6 +64,11 @@ function DashboardPromotores() {
     last_page: 1,
   });
 
+  // Estadísticas globales desde el backend
+  const [estadisticas, setEstadisticas] = useState(null);
+  const [loadingEstadisticas, setLoadingEstadisticas] = useState(true);
+  const [altasHoyCount, setAltasHoyCount] = useState(0);
+
   const loadUsers = async () => {
     try {
       const data = await getUsers();
@@ -71,6 +77,49 @@ function DashboardPromotores() {
       console.error("Error al cargar usuarios:", err);
     }
   };
+
+  const loadEstadisticas = useCallback(async () => {
+    try {
+      setLoadingEstadisticas(true);
+      const data = await getEstadisticasAltas();
+      setEstadisticas(data);
+      console.log("📊 Estadísticas cargadas:", data);
+    } catch (err) {
+      console.error("Error al cargar estadísticas:", err);
+    } finally {
+      setLoadingEstadisticas(false);
+    }
+  }, []);
+
+  const loadAltasHoy = useCallback(async () => {
+    try {
+      const hoy = new Date().toISOString().split("T")[0];
+
+      // Cargar todas las páginas de altas de hoy
+      let todasLasAltas = [];
+      let currentPageNum = 1;
+      let hasMorePages = true;
+
+      while (hasMorePages) {
+        const response = await getAllAltas({ fecha: hoy, page: currentPageNum });
+        const altasData = Array.isArray(response) ? response : response.data || [];
+
+        todasLasAltas = [...todasLasAltas, ...altasData];
+
+        // Verificar si hay más páginas
+        if (response.last_page && currentPageNum < response.last_page) {
+          currentPageNum++;
+        } else {
+          hasMorePages = false;
+        }
+      }
+
+      setAltasHoyCount(todasLasAltas.length);
+      console.log(`📅 Altas de hoy (${hoy}): ${todasLasAltas.length} (${currentPageNum} páginas)`);
+    } catch (err) {
+      console.error("Error al cargar altas de hoy:", err);
+    }
+  }, []);
 
   const loadAltas = useCallback(async () => {
     try {
@@ -82,30 +131,42 @@ function DashboardPromotores() {
       };
 
       if (selectedUser) filters.user_id = selectedUser;
-      if (selectedDate) filters.fecha = selectedDate;
 
-      // Para fecha de entrega, si es "En 7 días", usar rango desde hoy hasta 7 días
+      // Filtro por fecha de creación (created_at)
+      if (selectedDate) {
+        filters.fecha = selectedDate;
+      }
+
+      // Filtro por fecha de entrega (fecha_pedido)
       if (selectedFechaEntrega) {
         const today = new Date().toISOString().split("T")[0];
         const in7Days = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
 
-        if (selectedFechaEntrega === "rango_7_dias") {
-          // Filtrar desde hoy hasta dentro de 7 días
+        if (selectedFechaEntrega === "hoy") {
+          filters.fecha_pedido = today;
+        } else if (selectedFechaEntrega === "proximos_7_dias") {
           filters.fecha_pedido_desde = today;
           filters.fecha_pedido_hasta = in7Days;
-        } else {
-          // Fecha específica (Hoy)
-          filters.fecha_pedido = selectedFechaEntrega;
         }
       }
 
       if (selectedPromocion) filters.tipo_promocion_id = selectedPromocion;
-      if (selectedReparto) filters.nro_rto = selectedReparto;
+
+      // No enviamos nro_rto a la API porque causa CORS, filtraremos en el frontend
+      console.log("📤 Filtros enviados a la API:", filters);
 
       const response = await getAllAltas(filters);
 
       // Si la respuesta es un array directamente, usarlo. Si es un objeto con data, usar data
       let altasData = Array.isArray(response) ? response : response.data || [];
+
+      // Filtrar por reparto en el frontend
+      if (selectedReparto && selectedReparto.trim()) {
+        const repartoTrim = selectedReparto.trim();
+        console.log("🔍 Filtrando por reparto en frontend:", repartoTrim);
+        altasData = altasData.filter((alta) => alta.nro_rto === repartoTrim);
+        console.log(`✅ Resultados: ${altasData.length} altas con reparto ${repartoTrim}`);
+      }
 
       // Filtrar en el frontend si el backend no soporta los filtros de rango
       if (selectedFechaEntrega === "rango_7_dias") {
@@ -141,10 +202,12 @@ function DashboardPromotores() {
     currentPage,
   ]);
 
-  // Cargar usuarios al montar
+  // Cargar usuarios y estadísticas al montar
   useEffect(() => {
     loadUsers();
-  }, []);
+    loadEstadisticas();
+    loadAltasHoy();
+  }, [loadEstadisticas, loadAltasHoy]);
 
   // Recargar altas cuando cambian los filtros
   useEffect(() => {
@@ -167,8 +230,23 @@ function DashboardPromotores() {
   };
 
   const handlePromocionChange = (event) => {
-    setSelectedPromocion(event.target.value);
-    setCurrentPage(1);
+    setPromocionInput(event.target.value);
+  };
+
+  const handlePromocionKeyPress = (event) => {
+    if (event.key === "Enter") {
+      const trimmedValue = promocionInput.trim();
+      setSelectedPromocion(trimmedValue);
+      setCurrentPage(1);
+    }
+  };
+
+  const handlePromocionBlur = () => {
+    const trimmedValue = promocionInput.trim();
+    if (trimmedValue !== selectedPromocion) {
+      setSelectedPromocion(trimmedValue);
+      setCurrentPage(1);
+    }
   };
 
   const handleRepartoInputChange = (event) => {
@@ -177,14 +255,16 @@ function DashboardPromotores() {
 
   const handleRepartoKeyPress = (event) => {
     if (event.key === "Enter") {
-      setSelectedReparto(repartoInput);
+      const trimmedValue = repartoInput.trim();
+      setSelectedReparto(trimmedValue);
       setCurrentPage(1);
     }
   };
 
   const handleRepartoBlur = () => {
-    if (repartoInput !== selectedReparto) {
-      setSelectedReparto(repartoInput);
+    const trimmedValue = repartoInput.trim();
+    if (trimmedValue !== selectedReparto) {
+      setSelectedReparto(trimmedValue);
       setCurrentPage(1);
     }
   };
@@ -194,6 +274,7 @@ function DashboardPromotores() {
     setSelectedDate("");
     setSelectedFechaEntrega("");
     setSelectedPromocion("");
+    setPromocionInput("");
     setSelectedReparto("");
     setRepartoInput("");
     setCurrentPage(1);
@@ -211,39 +292,29 @@ function DashboardPromotores() {
     }
   };
 
-  // Calcular métricas
-  const totalAltas = pagination.total;
+  // Calcular métricas desde las estadísticas del backend
+  const totalAltas = estadisticas?.totales?.altas?.total_altas || 0;
 
-  // Obtener la fecha de hoy en formato YYYY-MM-DD
-  const hoy = new Date().toISOString().split("T")[0];
+  // Usar el contador de altas de hoy
+  const altasHoy = altasHoyCount;
 
-  const altasHoy = altas.filter((alta) => {
-    // Intentar obtener la fecha del alta de varios campos posibles
-    let altaDate = null;
+  const usuariosActivos = estadisticas?.altas_por_usuario?.length || 0;
 
-    if (alta.fecha_pedido) {
-      // Si existe fecha_pedido, usarla
-      altaDate = new Date(alta.fecha_pedido).toISOString().split("T")[0];
-    } else if (alta.created_at) {
-      // Si existe created_at, usarla
-      altaDate = new Date(alta.created_at).toISOString().split("T")[0];
-    }
-
-    return altaDate === hoy;
-  }).length;
-
-  const usuariosActivos = new Set(altas.map((alta) => alta.user_promo?.iduser_promo)).size;
+  // Métricas de consolidación desde el backend
+  const ventasConsolidadas = estadisticas?.totales?.altas?.total_consolidadas || 0;
+  const tasaConsolidacion =
+    totalAltas > 0 ? ((ventasConsolidadas / totalAltas) * 100).toFixed(1) : 0;
 
   // Preparar columnas de la tabla
   const columns = [
-    { Header: "Fecha/Hora", accessor: "fecha", width: "11%" },
-    { Header: "Fecha Entrega", accessor: "fechaEntrega", width: "11%" },
-    { Header: "Cliente", accessor: "cliente", width: "18%" },
-    { Header: "Dirección", accessor: "direccion", width: "16%" },
-    { Header: "Teléfono", accessor: "telefono", width: "10%" },
-    { Header: "Promotor", accessor: "promotor", width: "13%" },
-    { Header: "Promoción", accessor: "promocion", width: "13%" },
-    { Header: "Reparto", accessor: "reparto", width: "8%" },
+    { Header: "Fecha/Hora", accessor: "fecha", width: "13%" },
+    { Header: "Fecha Pedido", accessor: "fechaPedido", width: "13%" },
+    { Header: "Dirección", accessor: "direccion", width: "20%" },
+    { Header: "Teléfono", accessor: "telefono", width: "11%" },
+    { Header: "Promotor", accessor: "promotor", width: "17%" },
+    { Header: "Promoción", accessor: "promocion", width: "14%" },
+    { Header: "Reparto", accessor: "reparto", width: "6%" },
+    { Header: "Entrega", accessor: "entrega", width: "6%" },
   ];
 
   // Preparar filas de la tabla
@@ -259,14 +330,17 @@ function DashboardPromotores() {
       minute: "2-digit",
     });
 
-    // Fecha de entrega
-    const fechaEntrega = alta.fecha_pedido
-      ? new Date(alta.fecha_pedido).toLocaleDateString("es-AR", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-        })
-      : "-";
+    // Fecha de pedido (parsear como fecha local para evitar problemas de timezone)
+    let fechaPedido = "-";
+    if (alta.fecha_pedido) {
+      const [year, month, day] = alta.fecha_pedido.split("-");
+      const fechaPedidoDate = new Date(year, month - 1, day);
+      fechaPedido = fechaPedidoDate.toLocaleDateString("es-AR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+    }
 
     return {
       fecha: (
@@ -289,42 +363,50 @@ function DashboardPromotores() {
           </MDBox>
         </MDBox>
       ),
-      fechaEntrega: (
+      fechaPedido: (
         <MDBox display="flex" alignItems="center" gap={1}>
           <Icon fontSize="small" sx={{ color: "success.main" }}>
-            local_shipping
+            {alta.fecha_pedido && new Date(alta.fecha_pedido) < new Date(alta.created_at)
+              ? "history"
+              : "local_shipping"}
           </Icon>
           <MDTypography variant="caption" fontWeight="medium">
-            {fechaEntrega}
-          </MDTypography>
-        </MDBox>
-      ),
-      cliente: (
-        <MDBox display="flex" alignItems="center" gap={1}>
-          <Avatar
-            sx={{
-              bgcolor: "primary.main",
-              width: 32,
-              height: 32,
-              fontSize: 14,
-              fontWeight: "bold",
-            }}
-          >
-            {alta.nombre_completo.charAt(0).toUpperCase()}
-          </Avatar>
-          <MDTypography variant="caption" fontWeight="medium">
-            {alta.nombre_completo}
+            {fechaPedido}
           </MDTypography>
         </MDBox>
       ),
       direccion: (
-        <MDBox display="flex" alignItems="center" gap={0.5}>
-          <Icon fontSize="small" sx={{ color: "text.secondary", fontSize: 16 }}>
+        <MDBox display="flex" alignItems="center" gap={0.5} maxWidth="200px" width="200px">
+          <Icon fontSize="small" sx={{ color: "text.secondary", fontSize: 16, flexShrink: 0 }}>
             location_on
           </Icon>
-          <MDTypography variant="caption" color="text">
-            {alta.direccion}, {alta.localidad}
-          </MDTypography>
+          <MDBox sx={{ minWidth: 0, flex: 1 }}>
+            <MDTypography
+              variant="caption"
+              color="text"
+              sx={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                display: "block",
+              }}
+            >
+              {alta.direccion}, {alta.localidad}
+            </MDTypography>
+            <MDTypography
+              variant="caption"
+              sx={{
+                fontSize: "0.65rem",
+                color: "text.secondary",
+                display: "block",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {alta.nombre_completo}
+            </MDTypography>
+          </MDBox>
         </MDBox>
       ),
       telefono: (
@@ -383,6 +465,21 @@ function DashboardPromotores() {
           }}
         />
       ),
+      entrega: (
+        <Tooltip title={alta.visitado === 1 ? "Entregado" : "Pendiente de entrega"}>
+          <Chip
+            icon={<Icon fontSize="small">{alta.visitado === 1 ? "check_circle" : "pending"}</Icon>}
+            label={alta.visitado === 1 ? "OK" : "P"}
+            size="small"
+            color={alta.visitado === 1 ? "success" : "error"}
+            sx={{
+              fontWeight: "bold",
+              fontSize: "0.65rem",
+              minWidth: "40px",
+            }}
+          />
+        </Tooltip>
+      ),
     };
   });
 
@@ -409,17 +506,33 @@ function DashboardPromotores() {
                   },
                 }}
               >
-                <ComplexStatisticsCard
-                  color="dark"
-                  icon="people"
-                  title="Total Altas"
-                  count={totalAltas}
-                  percentage={{
-                    color: "success",
-                    amount: "",
-                    label: "En el período seleccionado",
-                  }}
-                />
+                {loadingEstadisticas ? (
+                  <MDBox
+                    display="flex"
+                    justifyContent="center"
+                    alignItems="center"
+                    height={130}
+                    borderRadius="xl"
+                    sx={{
+                      background: "linear-gradient(195deg, #42424a, #191919)",
+                      boxShadow: "0 4px 20px 0 rgba(0,0,0,0.14)",
+                    }}
+                  >
+                    <CircularProgress size={30} sx={{ color: "white" }} />
+                  </MDBox>
+                ) : (
+                  <ComplexStatisticsCard
+                    color="dark"
+                    icon="people"
+                    title="Total Altas"
+                    count={totalAltas}
+                    percentage={{
+                      color: "success",
+                      amount: "",
+                      label: "Del mes actual",
+                    }}
+                  />
+                )}
               </MDBox>
             </Grow>
           </Grid>
@@ -434,16 +547,32 @@ function DashboardPromotores() {
                   },
                 }}
               >
-                <ComplexStatisticsCard
-                  icon="today"
-                  title="Altas Hoy"
-                  count={altasHoy}
-                  percentage={{
-                    color: "success",
-                    amount: "",
-                    label: "Registradas hoy",
-                  }}
-                />
+                {loadingEstadisticas ? (
+                  <MDBox
+                    display="flex"
+                    justifyContent="center"
+                    alignItems="center"
+                    height={130}
+                    borderRadius="xl"
+                    sx={{
+                      background: "linear-gradient(195deg, #66BB6A, #43A047)",
+                      boxShadow: "0 4px 20px 0 rgba(0,0,0,0.14)",
+                    }}
+                  >
+                    <CircularProgress size={30} sx={{ color: "white" }} />
+                  </MDBox>
+                ) : (
+                  <ComplexStatisticsCard
+                    icon="today"
+                    title="Altas Hoy"
+                    count={altasHoy}
+                    percentage={{
+                      color: "success",
+                      amount: "",
+                      label: "Última alta registrada",
+                    }}
+                  />
+                )}
               </MDBox>
             </Grow>
           </Grid>
@@ -458,17 +587,33 @@ function DashboardPromotores() {
                   },
                 }}
               >
-                <ComplexStatisticsCard
-                  color="success"
-                  icon="person"
-                  title="Usuarios Activos"
-                  count={usuariosActivos}
-                  percentage={{
-                    color: "success",
-                    amount: "",
-                    label: "Con altas registradas",
-                  }}
-                />
+                {loadingEstadisticas ? (
+                  <MDBox
+                    display="flex"
+                    justifyContent="center"
+                    alignItems="center"
+                    height={130}
+                    borderRadius="xl"
+                    sx={{
+                      background: "linear-gradient(195deg, #66BB6A, #43A047)",
+                      boxShadow: "0 4px 20px 0 rgba(0,0,0,0.14)",
+                    }}
+                  >
+                    <CircularProgress size={30} sx={{ color: "white" }} />
+                  </MDBox>
+                ) : (
+                  <ComplexStatisticsCard
+                    color="success"
+                    icon="person"
+                    title="Usuarios Activos"
+                    count={usuariosActivos}
+                    percentage={{
+                      color: "success",
+                      amount: "",
+                      label: "Con altas registradas",
+                    }}
+                  />
+                )}
               </MDBox>
             </Grow>
           </Grid>
@@ -483,17 +628,33 @@ function DashboardPromotores() {
                   },
                 }}
               >
-                <ComplexStatisticsCard
-                  color="primary"
-                  icon="auto_graph"
-                  title="Promedio/Página"
-                  count={altas.length}
-                  percentage={{
-                    color: "success",
-                    amount: "",
-                    label: `de ${pagination.per_page} máximo`,
-                  }}
-                />
+                {loadingEstadisticas ? (
+                  <MDBox
+                    display="flex"
+                    justifyContent="center"
+                    alignItems="center"
+                    height={130}
+                    borderRadius="xl"
+                    sx={{
+                      background: "linear-gradient(195deg, #FFA726, #FB8C00)",
+                      boxShadow: "0 4px 20px 0 rgba(0,0,0,0.14)",
+                    }}
+                  >
+                    <CircularProgress size={30} sx={{ color: "white" }} />
+                  </MDBox>
+                ) : (
+                  <ComplexStatisticsCard
+                    color="warning"
+                    icon="monetization_on"
+                    title="Ventas Consolidadas"
+                    count={`${ventasConsolidadas} (${tasaConsolidacion}%)`}
+                    percentage={{
+                      color: tasaConsolidacion >= 50 ? "success" : "error",
+                      amount: "",
+                      label: `Tasa de conversión del mes`,
+                    }}
+                  />
+                )}
               </MDBox>
             </Grow>
           </Grid>
@@ -576,28 +737,23 @@ function DashboardPromotores() {
                   </Zoom>
 
                   <Zoom in timeout={800}>
-                    <FormControl
+                    <TextField
+                      label="Fecha de Creación"
+                      type="date"
+                      value={selectedDate}
+                      onChange={handleDateChange}
+                      InputLabelProps={{
+                        shrink: true,
+                      }}
                       sx={{
                         minWidth: 200,
                         transition: "all 0.3s",
                         "&:hover": { transform: "translateY(-2px)" },
                       }}
-                    >
-                      <InputLabel id="date-filter-label">Filtrar por Fecha</InputLabel>
-                      <Select
-                        labelId="date-filter-label"
-                        value={selectedDate}
-                        label="Filtrar por Fecha"
-                        onChange={handleDateChange}
-                        sx={{ height: "45px" }}
-                      >
-                        <MenuItem value="">
-                          <em>Todas las fechas</em>
-                        </MenuItem>
-                        <MenuItem value={today}>Hoy</MenuItem>
-                        <MenuItem value={in7Days}>En 7 días</MenuItem>
-                      </Select>
-                    </FormControl>
+                      InputProps={{
+                        sx: { height: "45px" },
+                      }}
+                    />
                   </Zoom>
 
                   <Zoom in timeout={1000}>
@@ -608,60 +764,40 @@ function DashboardPromotores() {
                         "&:hover": { transform: "translateY(-2px)" },
                       }}
                     >
-                      <InputLabel id="fecha-entrega-filter-label">Fecha de Entrega</InputLabel>
+                      <InputLabel id="fecha-entrega-filter-label">Fecha de Pedido</InputLabel>
                       <Select
                         labelId="fecha-entrega-filter-label"
                         value={selectedFechaEntrega}
-                        label="Fecha de Entrega"
+                        label="Fecha de Pedido"
                         onChange={handleFechaEntregaChange}
                         sx={{ height: "45px" }}
                       >
                         <MenuItem value="">
                           <em>Todas las fechas</em>
                         </MenuItem>
-                        <MenuItem value={today}>Hoy</MenuItem>
-                        <MenuItem value="rango_7_dias">Próximos 7 días</MenuItem>
+                        <MenuItem value="hoy">Hoy</MenuItem>
+                        <MenuItem value="proximos_7_dias">Próximos 7 días</MenuItem>
                       </Select>
                     </FormControl>
                   </Zoom>
 
                   <Zoom in timeout={1200}>
-                    <FormControl
+                    <TextField
+                      label="Promoción (ID)"
+                      value={promocionInput}
+                      onChange={handlePromocionChange}
+                      onKeyPress={handlePromocionKeyPress}
+                      onBlur={handlePromocionBlur}
+                      placeholder="Ej: 1, 2, 3... (Enter para filtrar)"
                       sx={{
-                        minWidth: 180,
+                        minWidth: 150,
                         transition: "all 0.3s",
                         "&:hover": { transform: "translateY(-2px)" },
                       }}
-                    >
-                      <InputLabel id="promocion-filter-label">Promoción</InputLabel>
-                      <Select
-                        labelId="promocion-filter-label"
-                        value={selectedPromocion}
-                        label="Promoción"
-                        onChange={handlePromocionChange}
-                        sx={{ height: "45px" }}
-                      >
-                        <MenuItem value="">
-                          <em>Todas</em>
-                        </MenuItem>
-                        {Array.from(
-                          new Set(
-                            altas
-                              .map((a) => a.promotion?.idtipo_promocion)
-                              .filter((id) => id !== null && id !== undefined)
-                          )
-                        ).map((id) => {
-                          const promo = altas.find(
-                            (a) => a.promotion?.idtipo_promocion === id
-                          )?.promotion;
-                          return (
-                            <MenuItem key={id} value={id}>
-                              {promo?.name || `Promoción ${id}`}
-                            </MenuItem>
-                          );
-                        })}
-                      </Select>
-                    </FormControl>
+                      InputProps={{
+                        sx: { height: "45px" },
+                      }}
+                    />
                   </Zoom>
 
                   <Zoom in timeout={1400}>
@@ -763,8 +899,9 @@ function DashboardPromotores() {
                       <DataTable
                         table={{ columns, rows }}
                         isSorted={false}
-                        entriesPerPage={false}
+                        entriesPerPage={{ defaultValue: 50, entries: [10, 25, 50, 100] }}
                         showTotalEntries={false}
+                        pagination={false}
                         noEndBorder
                       />
 

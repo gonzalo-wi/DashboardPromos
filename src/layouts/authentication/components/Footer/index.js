@@ -43,7 +43,7 @@ function Footer({ light }) {
             color={light ? "white" : "text"}
             fontSize={size.sm}
           >
-            &copy; {new Date().getFullYear()}, Desarrollado por Gonzalo Winazki
+            &copy; {new Date().getFullYear()}, Desarrollado por Gonzalo Winazki & Leandro Peralta
           </MDBox>
         </MDBox>
       </Container>

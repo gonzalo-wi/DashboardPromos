@@ -135,6 +135,31 @@ export const getMyAltas = async () => {
 };
 
 /**
+ * Obtener estadísticas completas de altas
+ * Endpoint: GET /api/promos/admin/altas/estadisticas
+ *
+ * @returns {Promise<Object>} Estadísticas completas incluyendo ultima_alta, altas_por_usuario y totales
+ */
+export const getEstadisticasAltas = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/altas/estadisticas`, {
+      method: "GET",
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Error al obtener estadísticas");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("❌ Error al obtener estadísticas:", error);
+    throw error;
+  }
+};
+
+/**
  * Calcular métricas de efectividad a partir de altas
  *
  * @param {Array} altas - Array de altas
