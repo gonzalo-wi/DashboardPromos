@@ -327,23 +327,70 @@ function DashboardPromotores() {
 
       console.log("📊 Cargando todos los datos para exportar...", filters);
 
-      // Cargar todas las páginas
+      // Cargar todas las páginas con manejo de errores
       let todasLasAltas = [];
       let pageNum = 1;
       let hasMorePages = true;
+      let erroresConsecutivos = 0;
+      let totalErrores = 0;
+      const MAX_PAGES = 100; // Límite de seguridad
+      const MAX_ERRORES_CONSECUTIVOS = 3;
+      const DELAY_MS = 300; // Delay entre requests
 
-      while (hasMorePages) {
-        const response = await getAllAltas({ ...filters, page: pageNum });
-        const altasData = Array.isArray(response) ? response : response.data || [];
+      // Helper para delay
+      const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-        todasLasAltas = [...todasLasAltas, ...altasData];
+      while (hasMorePages && pageNum <= MAX_PAGES) {
+        try {
+          const response = await getAllAltas({ ...filters, page: pageNum });
+          const altasData = Array.isArray(response) ? response : response.data || [];
 
-        // Verificar si hay más páginas
-        if (response.last_page && pageNum < response.last_page) {
+          if (altasData.length === 0 && pageNum > 1) {
+            // Si no hay datos y no es la primera página, terminamos
+            hasMorePages = false;
+            break;
+          }
+
+          todasLasAltas = [...todasLasAltas, ...altasData];
+          erroresConsecutivos = 0; // Resetear errores consecutivos en éxito
+
+          console.log(`✅ Página ${pageNum} cargada: ${altasData.length} registros`);
+
+          // Verificar si hay más páginas
+          if (response.last_page && pageNum < response.last_page) {
+            pageNum++;
+            // Pequeño delay para no saturar el servidor
+            if (pageNum <= response.last_page) {
+              await delay(DELAY_MS);
+            }
+          } else {
+            hasMorePages = false;
+          }
+        } catch (error) {
+          console.error(`❌ Error en página ${pageNum}:`, error);
+          erroresConsecutivos++;
+          totalErrores++;
+
+          // Si hay demasiados errores consecutivos, detener
+          if (erroresConsecutivos >= MAX_ERRORES_CONSECUTIVOS) {
+            console.warn(
+              `⚠️ ${MAX_ERRORES_CONSECUTIVOS} errores consecutivos, deteniendo carga. Datos cargados: ${todasLasAltas.length}`
+            );
+            break;
+          }
+
+          // Intentar con la siguiente página después de un pequeño delay
           pageNum++;
-        } else {
-          hasMorePages = false;
+          await delay(DELAY_MS * 2); // Delay más largo después de error
         }
+      }
+
+      if (todasLasAltas.length === 0) {
+        alert(
+          "No se pudieron cargar datos. Verifica tu conexión o intenta con filtros más específicos."
+        );
+        setExportando(false);
+        return;
       }
 
       // Filtrar por rango de fechas en el frontend
@@ -381,10 +428,16 @@ function DashboardPromotores() {
 
       if (todasLasAltas.length === 0) {
         alert("No hay datos para exportar con los filtros seleccionados");
+        setExportando(false);
         return;
       }
 
       console.log(`✅ Se exportarán ${todasLasAltas.length} registros`);
+      if (totalErrores > 0) {
+        console.warn(
+          `⚠️ Se encontraron ${totalErrores} errores durante la carga. Algunos registros podrían no estar incluidos.`
+        );
+      }
 
       // Preparar los datos para Excel
       const excelData = todasLasAltas.map((alta) => {
@@ -460,12 +513,26 @@ function DashboardPromotores() {
       // Descargar archivo
       XLSX.writeFile(wb, fileName);
 
-      // Cerrar modal y mostrar éxito
+      // Cerrar modal primero para evitar warnings de aria-hidden
       setOpenExportModal(false);
-      alert(`✅ Se exportaron ${todasLasAltas.length} registros correctamente`);
+
+      // Mostrar mensaje después de un pequeño delay
+      setTimeout(() => {
+        const mensaje =
+          totalErrores > 0
+            ? `✅ Se exportaron ${todasLasAltas.length} registros.\n⚠️ Nota: Se encontraron ${totalErrores} errores de conexión. Algunos registros podrían no estar incluidos.`
+            : `✅ Se exportaron ${todasLasAltas.length} registros correctamente`;
+        alert(mensaje);
+      }, 100);
     } catch (error) {
       console.error("❌ Error al exportar:", error);
-      alert("Error al exportar los datos. Intenta de nuevo.");
+      setOpenExportModal(false);
+      setTimeout(() => {
+        alert(
+          "Error al exportar los datos. " +
+            "Si el problema persiste, intenta seleccionar un rango de fechas más corto o filtrar por promotor específico."
+        );
+      }, 100);
     } finally {
       setExportando(false);
     }
