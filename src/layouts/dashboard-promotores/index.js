@@ -22,6 +22,11 @@ import Grow from "@mui/material/Grow";
 import Zoom from "@mui/material/Zoom";
 import Tooltip from "@mui/material/Tooltip";
 import Avatar from "@mui/material/Avatar";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
+import * as XLSX from "xlsx";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
@@ -68,6 +73,12 @@ function DashboardPromotores() {
   const [estadisticas, setEstadisticas] = useState(null);
   const [loadingEstadisticas, setLoadingEstadisticas] = useState(true);
   const [altasHoyCount, setAltasHoyCount] = useState(0);
+
+  // Estados para el modal de exportación
+  const [openExportModal, setOpenExportModal] = useState(false);
+  const [exportFechaDesde, setExportFechaDesde] = useState("");
+  const [exportFechaHasta, setExportFechaHasta] = useState("");
+  const [exportando, setExportando] = useState(false);
 
   const loadUsers = async () => {
     try {
@@ -280,6 +291,186 @@ function DashboardPromotores() {
     setCurrentPage(1);
   };
 
+  const handleOpenExportModal = () => {
+    const hoy = new Date();
+    const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split("T")[0];
+    const ultimoDiaMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0)
+      .toISOString()
+      .split("T")[0];
+
+    setExportFechaDesde(primerDiaMes);
+    setExportFechaHasta(ultimoDiaMes);
+    setOpenExportModal(true);
+  };
+
+  const handleCloseExportModal = () => {
+    setOpenExportModal(false);
+  };
+
+  const handleConfirmExport = async () => {
+    try {
+      setExportando(true);
+
+      // Validar que fecha desde sea menor o igual a fecha hasta
+      if (exportFechaDesde > exportFechaHasta) {
+        alert("La fecha DESDE debe ser anterior o igual a la fecha HASTA");
+        setExportando(false);
+        return;
+      }
+
+      console.log(`📊 Exportando desde ${exportFechaDesde} hasta ${exportFechaHasta}`);
+
+      // Construir filtros para obtener todos los datos
+      const filters = {};
+      if (selectedUser) filters.user_id = selectedUser;
+      if (selectedPromocion) filters.tipo_promocion_id = selectedPromocion;
+
+      console.log("📊 Cargando todos los datos para exportar...", filters);
+
+      // Cargar todas las páginas
+      let todasLasAltas = [];
+      let pageNum = 1;
+      let hasMorePages = true;
+
+      while (hasMorePages) {
+        const response = await getAllAltas({ ...filters, page: pageNum });
+        const altasData = Array.isArray(response) ? response : response.data || [];
+
+        todasLasAltas = [...todasLasAltas, ...altasData];
+
+        // Verificar si hay más páginas
+        if (response.last_page && pageNum < response.last_page) {
+          pageNum++;
+        } else {
+          hasMorePages = false;
+        }
+      }
+
+      // Filtrar por rango de fechas en el frontend
+      todasLasAltas = todasLasAltas.filter((alta) => {
+        if (!alta.created_at) return false;
+        const fechaAlta = new Date(alta.created_at).toISOString().split("T")[0];
+        return fechaAlta >= exportFechaDesde && fechaAlta <= exportFechaHasta;
+      });
+
+      // Filtrar por reparto en el frontend si está seleccionado
+      if (selectedReparto && selectedReparto.trim()) {
+        const repartoTrim = selectedReparto.trim();
+        todasLasAltas = todasLasAltas.filter((alta) => alta.nro_rto === repartoTrim);
+      }
+
+      // Filtrar por fecha de entrega si está seleccionado
+      if (selectedFechaEntrega) {
+        const today = new Date().toISOString().split("T")[0];
+        const in7Days = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+
+        if (selectedFechaEntrega === "hoy") {
+          todasLasAltas = todasLasAltas.filter((alta) => {
+            if (!alta.fecha_pedido) return false;
+            const fechaPedido = new Date(alta.fecha_pedido).toISOString().split("T")[0];
+            return fechaPedido === today;
+          });
+        } else if (selectedFechaEntrega === "proximos_7_dias") {
+          todasLasAltas = todasLasAltas.filter((alta) => {
+            if (!alta.fecha_pedido) return false;
+            const fechaPedido = new Date(alta.fecha_pedido).toISOString().split("T")[0];
+            return fechaPedido >= today && fechaPedido <= in7Days;
+          });
+        }
+      }
+
+      if (todasLasAltas.length === 0) {
+        alert("No hay datos para exportar con los filtros seleccionados");
+        return;
+      }
+
+      console.log(`✅ Se exportarán ${todasLasAltas.length} registros`);
+
+      // Preparar los datos para Excel
+      const excelData = todasLasAltas.map((alta) => {
+        const fecha = new Date(alta.created_at);
+        const fechaStr = fecha.toLocaleDateString("es-AR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        });
+        const horaStr = fecha.toLocaleTimeString("es-AR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+        let fechaPedido = "-";
+        if (alta.fecha_pedido) {
+          const [year, month, day] = alta.fecha_pedido.split("-");
+          const fechaPedidoDate = new Date(year, month - 1, day);
+          fechaPedido = fechaPedidoDate.toLocaleDateString("es-AR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          });
+        }
+
+        return {
+          Fecha: fechaStr,
+          Hora: horaStr,
+          "Fecha Pedido": fechaPedido,
+          Dirección: alta.direccion,
+          Localidad: alta.localidad,
+          "Nombre Completo": alta.nombre_completo,
+          Teléfono: alta.telefono,
+          "N° Cuenta": alta.id_nroCta_aguas || "-",
+          Promotor: alta.user_promo?.name || "-",
+          Usuario: alta.user_promo?.username || "-",
+          Promoción: alta.promotion?.name || "Sin promoción",
+          Reparto: alta.nro_rto,
+          Entrega: alta.visitado === 1 ? "Entregado" : "Pendiente",
+        };
+      });
+
+      // Crear libro de trabajo y hoja
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Altas");
+
+      // Ajustar ancho de columnas
+      const colWidths = [
+        { wch: 12 }, // Fecha
+        { wch: 8 }, // Hora
+        { wch: 12 }, // Fecha Pedido
+        { wch: 30 }, // Dirección
+        { wch: 20 }, // Localidad
+        { wch: 25 }, // Nombre Completo
+        { wch: 15 }, // Teléfono
+        { wch: 12 }, // N° Cuenta
+        { wch: 20 }, // Promotor
+        { wch: 15 }, // Usuario
+        { wch: 20 }, // Promoción
+        { wch: 8 }, // Reparto
+        { wch: 12 }, // Entrega
+      ];
+      ws["!cols"] = colWidths;
+
+      // Generar nombre del archivo
+      const promotorNombre = selectedUser
+        ? users.find((u) => u.id === selectedUser)?.name || "Filtrado"
+        : "Todos";
+      const fechaActual = new Date().toISOString().split("T")[0];
+      const fileName = `Altas_${promotorNombre}_${fechaActual}.xlsx`;
+
+      // Descargar archivo
+      XLSX.writeFile(wb, fileName);
+
+      // Cerrar modal y mostrar éxito
+      setOpenExportModal(false);
+      alert(`✅ Se exportaron ${todasLasAltas.length} registros correctamente`);
+    } catch (error) {
+      console.error("❌ Error al exportar:", error);
+      alert("Error al exportar los datos. Intenta de nuevo.");
+    } finally {
+      setExportando(false);
+    }
+  };
+
   const handlePreviousPage = () => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
@@ -307,12 +498,13 @@ function DashboardPromotores() {
 
   // Preparar columnas de la tabla
   const columns = [
-    { Header: "Fecha/Hora", accessor: "fecha", width: "13%" },
-    { Header: "Fecha Pedido", accessor: "fechaPedido", width: "13%" },
-    { Header: "Dirección", accessor: "direccion", width: "20%" },
-    { Header: "Teléfono", accessor: "telefono", width: "11%" },
-    { Header: "Promotor", accessor: "promotor", width: "17%" },
-    { Header: "Promoción", accessor: "promocion", width: "14%" },
+    { Header: "Fecha/Hora", accessor: "fecha", width: "12%" },
+    { Header: "Fecha Pedido", accessor: "fechaPedido", width: "12%" },
+    { Header: "Dirección", accessor: "direccion", width: "18%" },
+    { Header: "Teléfono", accessor: "telefono", width: "10%" },
+    { Header: "N Cuenta", accessor: "nCuenta", width: "9%" },
+    { Header: "Promotor", accessor: "promotor", width: "15%" },
+    { Header: "Promoción", accessor: "promocion", width: "12%" },
     { Header: "Reparto", accessor: "reparto", width: "6%" },
     { Header: "Entrega", accessor: "entrega", width: "6%" },
   ];
@@ -418,6 +610,11 @@ function DashboardPromotores() {
           color="info"
           sx={{ borderRadius: "8px", fontWeight: "medium" }}
         />
+      ),
+      nCuenta: (
+        <MDTypography variant="caption" fontWeight="medium">
+          {alta.id_nroCta_aguas || "-"}
+        </MDTypography>
       ),
       promotor: (
         <MDBox display="flex" alignItems="center" gap={1}>
@@ -843,6 +1040,25 @@ function DashboardPromotores() {
 
                   <MDBox flexGrow={1} />
 
+                  <Zoom in timeout={1600}>
+                    <Tooltip title="Exportar datos filtrados a Excel" arrow>
+                      <MDButton
+                        variant="gradient"
+                        color="success"
+                        onClick={handleOpenExportModal}
+                        disabled={loading}
+                        sx={{
+                          transition: "all 0.3s",
+                          "&:hover": {
+                            transform: "scale(1.05)",
+                          },
+                        }}
+                      >
+                        <Icon>file_download</Icon>&nbsp; Exportar Excel
+                      </MDButton>
+                    </Tooltip>
+                  </Zoom>
+
                   <Chip
                     icon={<Icon fontSize="small">info</Icon>}
                     label={`Mostrando ${altas.length} de ${pagination.total} altas`}
@@ -961,6 +1177,114 @@ function DashboardPromotores() {
           </Grid>
         </Grid>
       </MDBox>
+
+      {/* Modal de Exportación */}
+      <Dialog
+        open={openExportModal}
+        onClose={handleCloseExportModal}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: "12px",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            background: "linear-gradient(195deg, #66BB6A, #43A047)",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            py: 2.5,
+          }}
+        >
+          <Icon sx={{ fontSize: 28 }}>file_download</Icon>
+          <MDBox>
+            <MDTypography variant="h5" fontWeight="bold" color="white">
+              Exportar a Excel
+            </MDTypography>
+            <MDTypography variant="caption" color="white" opacity={0.9}>
+              Selecciona el rango de fechas para exportar
+            </MDTypography>
+          </MDBox>
+        </DialogTitle>
+
+        <DialogContent sx={{ mt: 3, px: 3 }}>
+          <MDBox display="flex" flexDirection="column" gap={3}>
+            <MDBox>
+              <MDTypography variant="caption" fontWeight="medium" color="text" mb={0.5}>
+                Fecha Desde
+              </MDTypography>
+              <TextField
+                type="date"
+                value={exportFechaDesde}
+                onChange={(e) => setExportFechaDesde(e.target.value)}
+                fullWidth
+                InputProps={{
+                  startAdornment: <Icon sx={{ mr: 1, color: "text.secondary" }}>event</Icon>,
+                }}
+              />
+            </MDBox>
+
+            <MDBox>
+              <MDTypography variant="caption" fontWeight="medium" color="text" mb={0.5}>
+                Fecha Hasta
+              </MDTypography>
+              <TextField
+                type="date"
+                value={exportFechaHasta}
+                onChange={(e) => setExportFechaHasta(e.target.value)}
+                fullWidth
+                InputProps={{
+                  startAdornment: <Icon sx={{ mr: 1, color: "text.secondary" }}>event</Icon>,
+                }}
+              />
+            </MDBox>
+
+            <Alert severity="info" icon={<Icon>info</Icon>}>
+              <MDTypography variant="caption" color="dark">
+                Se exportarán todos los registros que coincidan con los filtros seleccionados y el
+                rango de fechas especificado.
+              </MDTypography>
+            </Alert>
+          </MDBox>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
+          <MDButton
+            variant="outlined"
+            color="secondary"
+            onClick={handleCloseExportModal}
+            disabled={exportando}
+          >
+            Cancelar
+          </MDButton>
+          <MDButton
+            variant="gradient"
+            color="success"
+            onClick={handleConfirmExport}
+            disabled={exportando || !exportFechaDesde || !exportFechaHasta}
+            sx={{
+              minWidth: 120,
+            }}
+          >
+            {exportando ? (
+              <>
+                <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
+                Exportando...
+              </>
+            ) : (
+              <>
+                <Icon>download</Icon>&nbsp;Exportar
+              </>
+            )}
+          </MDButton>
+        </DialogActions>
+      </Dialog>
+
       <Footer />
     </DashboardLayout>
   );
